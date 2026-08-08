@@ -26,12 +26,14 @@ const open = defineModel<boolean>('open', { required: true })
   background: rgb(0 0 0 / 0.5);
 }
 
+/* inset + auto margins centre on both axes without a transform, which would
+   land the box on half pixels and blur the text. */
 .dialog {
   position: fixed;
-  top: 22%;
-  left: 50%;
-  transform: translateX(-50%);
+  inset: 0;
+  margin: auto;
   width: 380px;
+  height: fit-content;
   max-height: 76vh;
   overflow-y: auto;
   padding: 16px;
@@ -72,15 +74,6 @@ const open = defineModel<boolean>('open', { required: true })
 .dialog input[type='text']:focus {
   outline: none;
   border-color: var(--accent);
-}
-
-.dialog .check {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  color: var(--text);
-  font-size: var(--fs-small);
 }
 
 .dialog .actions {

@@ -13,6 +13,7 @@ import {
 import type { Selected, TreeNode } from '@/types'
 import { lineRefs } from '@/utils/lines'
 import { allDirs, buildTree } from '@/utils/tree'
+import Check from '@/components/Check.vue'
 import DiffView from '@/components/DiffView.vue'
 import FileTree from '@/components/FileTree.vue'
 
@@ -397,7 +398,7 @@ watch(
         </div>
 
         <div class="commit-row">
-          <label class="amend"><input v-model="amend" type="checkbox" /> Amend</label>
+          <Check v-model="amend" class="amend">Amend</Check>
           <span class="spacer"></span>
           <button class="primary" :disabled="!canCommit" @click="commit">
             {{ amend ? 'Amend Commit' : `Commit ${staged.length} File${staged.length === 1 ? '' : 's'}` }}
@@ -586,10 +587,6 @@ watch(
 }
 
 .amend {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--fs-small);
   color: var(--text-muted);
 }
 

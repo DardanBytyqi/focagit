@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import Check from '@/components/Check.vue'
 import Modal from '@/components/Modal.vue'
 import { useRepo } from '@/composables/useRepo'
 import type { BranchRequest } from '@/types'
@@ -69,10 +70,9 @@ async function submit() {
         Starting from <span class="mono">{{ request.startLabel }}</span>
       </p>
 
-      <label v-if="request?.kind === 'create'" class="check">
-        <input v-model="andCheckout" type="checkbox" />
+      <Check v-if="request?.kind === 'create'" v-model="andCheckout" class="check">
         Check out after creating
-      </label>
+      </Check>
 
       <p v-if="state.error" class="error">{{ state.error }}</p>
 
@@ -85,3 +85,9 @@ async function submit() {
     </form>
   </Modal>
 </template>
+
+<style scoped>
+.check {
+  margin-top: 10px;
+}
+</style>
