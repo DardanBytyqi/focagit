@@ -8,6 +8,8 @@ const props = defineProps<{
   count: number
   loading: boolean
   error: string
+  /** git's own progress line while a fetch or push runs; empty when idle. */
+  network: string
 }>()
 
 const changes = computed(() => props.status?.files?.length ?? 0)
@@ -28,7 +30,8 @@ const changes = computed(() => props.status?.files?.length ?? 0)
     <span v-else class="muted">no repository open</span>
 
     <span class="spacer"></span>
-    <span v-if="error" class="error" :title="error">{{ error }}</span>
+    <span v-if="network" class="network mono">{{ network }}</span>
+    <span v-else-if="error" class="error" :title="error">{{ error }}</span>
   </div>
 </template>
 
@@ -71,6 +74,15 @@ const changes = computed(() => props.status?.files?.length ?? 0)
 
 .error {
   color: var(--red);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50%;
+}
+
+/* Progress outranks the last error: it is what is happening now. */
+.network {
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

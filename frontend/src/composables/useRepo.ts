@@ -5,10 +5,13 @@ import {
   CheckoutCommit,
   CreateBranch,
   DeleteBranch,
+  Fetch,
   GetHistory,
+  GetRemotes,
   InitRepo,
   Inspect,
   OpenRepo,
+  Push,
   Refs,
   RenameBranch,
   SelectRepo,
@@ -31,6 +34,9 @@ interface State {
   error: string
   /** Set when the chosen folder exists but holds no repository yet. */
   initCandidate: string
+  remotes: git.Remote[]
+  /** git's own progress line while a fetch or push runs; empty when idle. */
+  network: string
 }
 
 const state = reactive<State>({
@@ -43,6 +49,8 @@ const state = reactive<State>({
   status: null,
   error: '',
   initCandidate: '',
+  remotes: [],
+  network: '',
 })
 
 interface Progress {
@@ -66,6 +74,20 @@ EventsOn('repo:progress', (p: Progress) => {
 
   // Refs and status are only worth reading once the walk is done.
   if (p.done) void refresh()
+})
+
+interface NetworkEvent {
+  id: string
+  op: string
+  line: string
+  done: boolean
+  error: string
+}
+
+// Fetch and push report what they are doing while they do it.
+EventsOn('repo:network', (n: NetworkEvent) => {
+  if (!state.info || n.id !== state.info.id) return
+  state.network = n.done ? '' : n.line
 })
 
 async function open(path: string) {
@@ -153,6 +175,35 @@ async function act(fn: (id: string) => Promise<void>): Promise<boolean> {
   }
 }
 
+/** Reads the remotes; the push dialog needs them before it can offer a choice. */
+async function loadRemotes() {
+  if (!state.info) return
+  try {
+    state.remotes = await GetRemotes(state.info.id)
+  } catch (e) {
+    state.error = errorText(e)
+  }
+}
+
+const fetchAll = (opts: git.FetchOptions) => act((id) => Fetch(id, opts))
+
+/**
+ * Pushes and returns what the remote made of each ref, or null when it refused.
+ * The refusal is left in state.error, as with every other write.
+ */
+async function push(opts: git.PushOptions): Promise<git.PushResult[] | null> {
+  if (!state.info) return null
+  state.error = ''
+  try {
+    const res = await Push(state.info.id, opts)
+    await refresh()
+    return res
+  } catch (e) {
+    state.error = errorText(e)
+    return null
+  }
+}
+
 const checkout = (ref: git.Ref) => act((id) => Checkout(id, ref))
 const checkoutCommit = (hash: string) => act((id) => CheckoutCommit(id, hash))
 const createBranch = (opts: git.CreateBranchOptions) => act((id) => CreateBranch(id, opts))
@@ -171,5 +222,8 @@ export function useRepo() {
     createBranch,
     deleteBranch,
     renameBranch,
+    loadRemotes,
+    fetchAll,
+    push,
   }
 }

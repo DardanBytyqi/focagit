@@ -257,3 +257,15 @@ func (r *Repo) DeleteBranch(ctx context.Context, name string, force bool) error 
 func (r *Repo) RenameBranch(ctx context.Context, from, to string) error {
 	return r.git.RenameBranch(ctx, from, to)
 }
+
+func (r *Repo) Remotes(ctx context.Context) ([]git.Remote, error) {
+	return r.git.Remotes(ctx)
+}
+
+func (r *Repo) Fetch(ctx context.Context, opts git.FetchOptions, onProgress func(string)) error {
+	return r.git.Fetch(ctx, opts, onProgress)
+}
+
+func (r *Repo) Push(ctx context.Context, opts git.PushOptions, onProgress func(string)) ([]git.PushResult, error) {
+	return r.git.Push(ctx, opts, onProgress)
+}

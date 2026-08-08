@@ -408,3 +408,78 @@ func (a *App) RenameBranch(id, from, to string) error {
 	}
 	return repo.RenameBranch(a.ctx, from, to)
 }
+
+// --- remotes ------------------------------------------------------------------
+
+// Network is what a fetch or a push is doing right now, pushed as it happens.
+type Network struct {
+	ID string `json:"id"`
+	// Op is "fetch" or "push", so the UI can say which one is running.
+	Op string `json:"op"`
+	// Line is git's own progress text, e.g. "Receiving objects:  62% (31/50)".
+	Line  string `json:"line"`
+	Done  bool   `json:"done"`
+	Error string `json:"error"`
+}
+
+// GetRemotes lists where this repository can fetch from and push to.
+func (a *App) GetRemotes(id string) ([]git.Remote, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	list, err := repo.Remotes(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		list = []git.Remote{}
+	}
+	return list, nil
+}
+
+// report emits one network progress line to the frontend.
+func (a *App) report(id, op string) func(string) {
+	return func(line string) {
+		runtime.EventsEmit(a.ctx, "repo:network", Network{ID: id, Op: op, Line: line})
+	}
+}
+
+// Fetch brings down remote branches, then rewalks: new commits are now reachable.
+func (a *App) Fetch(id string, opts git.FetchOptions) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+
+	err = repo.Fetch(a.ctx, opts, a.report(id, "fetch"))
+	runtime.EventsEmit(a.ctx, "repo:network", Network{ID: id, Op: "fetch", Done: true, Error: errText(err)})
+	if err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// Push sends commits to a remote and returns what the remote made of each ref.
+func (a *App) Push(id string, opts git.PushOptions) ([]git.PushResult, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := repo.Push(a.ctx, opts, a.report(id, "push"))
+	runtime.EventsEmit(a.ctx, "repo:network", Network{ID: id, Op: "push", Done: true, Error: errText(err)})
+	if res == nil {
+		res = []git.PushResult{}
+	}
+	return res, err
+}
+
+// errText is "" for no error, which is what the frontend checks.
+func errText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}

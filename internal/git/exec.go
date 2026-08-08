@@ -1,6 +1,7 @@
 package git
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -133,6 +134,64 @@ func (r runner) input(ctx context.Context, stdin string, args ...string) ([]byte
 		}
 	}
 	return stdout.Bytes(), nil
+}
+
+// progress runs git, returns its stdout, and hands each stderr line to fn as it
+// arrives. Network commands report how far along they are on stderr.
+func (r runner) progress(ctx context.Context, fn func(string), args ...string) ([]byte, error) {
+	start := time.Now()
+
+	cmd := r.command(ctx, args...)
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+
+	pipe, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, &CommandError{Args: args, Err: err}
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, &CommandError{Args: args, Err: err}
+	}
+
+	var stderr strings.Builder
+	sc := bufio.NewScanner(pipe)
+	sc.Split(scanProgress)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+		stderr.WriteString(line + "\n")
+		if fn != nil {
+			fn(line)
+		}
+	}
+
+	waitErr := cmd.Wait()
+	r.finish(args, start, stderr.String(), waitErr)
+	if waitErr != nil {
+		return stdout.Bytes(), &CommandError{
+			Args:   args,
+			Stderr: strings.TrimSpace(stderr.String()),
+			Err:    waitErr,
+		}
+	}
+	return stdout.Bytes(), nil
+}
+
+// scanProgress splits on carriage returns too, because that is how git redraws
+// a percentage in place rather than printing a new line.
+func scanProgress(data []byte, atEOF bool) (int, []byte, error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	if i := bytes.IndexAny(data, "\r\n"); i >= 0 {
+		return i + 1, data[:i], nil
+	}
+	if atEOF {
+		return len(data), data, nil
+	}
+	return 0, nil, nil
 }
 
 // stream runs git and hands stdout to fn while git is still producing it.

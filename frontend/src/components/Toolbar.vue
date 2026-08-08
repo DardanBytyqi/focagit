@@ -6,9 +6,18 @@ const props = defineProps<{
   info: session.Info | null
   status: git.Status | null
   signature: git.Signature | null
+  /** True while a fetch or push is running, so it cannot be started twice. */
+  busy?: boolean
 }>()
 
-const emit = defineEmits<{ browse: []; refresh: []; branch: []; identity: [] }>()
+const emit = defineEmits<{
+  browse: []
+  refresh: []
+  branch: []
+  identity: []
+  fetch: []
+  push: []
+}>()
 
 // An identity inherited from the global config is the one that commits under the
 // wrong address, so it is worth showing rather than hiding.
@@ -21,13 +30,36 @@ const who = computed(() => {
 })
 
 // Still to come in stage 6.
-const pending = ['Pull', 'Push', 'Merge', 'Stash']
+const pending = ['Pull', 'Merge', 'Stash']
+
+// A branch nobody has pushed yet has nothing to compare against, so "up to date"
+// would be a lie; the push dialog is still the way to publish it.
+const ahead = computed(() => props.status?.ahead ?? 0)
 </script>
 
 <template>
   <div class="toolbar">
     <button @click="emit('browse')">Open…</button>
     <button :disabled="!info" @click="emit('refresh')">Refresh</button>
+
+    <span class="sep"></span>
+
+    <button
+      :disabled="!info || busy"
+      title="Bring down remote branches without touching yours"
+      @click="emit('fetch')"
+    >
+      Fetch
+    </button>
+
+    <button
+      :disabled="!info || busy"
+      title="Send your commits to a remote"
+      @click="emit('push')"
+    >
+      Push
+      <span v-if="ahead" class="badge">{{ ahead }}</span>
+    </button>
 
     <span class="sep"></span>
 
@@ -90,6 +122,16 @@ const pending = ['Pull', 'Push', 'Merge', 'Stash']
 
 .spacer {
   flex: 1;
+}
+
+/* How many commits are waiting to go out, on the button that sends them. */
+.badge {
+  margin-left: 5px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
 }
 
 .identity {

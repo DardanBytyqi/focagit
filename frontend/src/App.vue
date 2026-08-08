@@ -8,6 +8,7 @@ import CommitDetail from '@/components/CommitDetail.vue'
 import CommitList from '@/components/CommitList.vue'
 import DeleteBranchDialog from '@/components/DeleteBranchDialog.vue'
 import IdentityDialog from '@/components/IdentityDialog.vue'
+import PushDialog from '@/components/PushDialog.vue'
 import RecentList from '@/components/RecentList.vue'
 import Sidebar from '@/components/Sidebar.vue'
 import StatusBar from '@/components/StatusBar.vue'
@@ -16,10 +17,20 @@ import type { BranchRequest, DeleteRequest } from '@/types'
 import { usePrefs } from './composables/usePrefs'
 import { useRepo } from './composables/useRepo'
 
-const { state, open, browse, refresh, initHere, checkout, checkoutCommit } = useRepo()
+const { state, open, browse, refresh, initHere, checkout, checkoutCommit, fetchAll } = useRepo()
 const { state: prefsState, loadSignature } = usePrefs()
 
 const identityOpen = ref(false)
+const pushOpen = ref(false)
+const fetching = ref(false)
+
+// Pruning on every fetch: a remote branch that is gone stays listed otherwise,
+// and a stale sidebar is worse than a slightly slower fetch.
+async function doFetch() {
+  fetching.value = true
+  await fetchAll({ remote: '', prune: true, tags: false })
+  fetching.value = false
+}
 
 // Who commits here is a property of the repository, so it is re-read on every open.
 watch(() => state.info?.id ?? null, loadSignature, { immediate: true })
@@ -122,10 +133,13 @@ function startDrag(e: MouseEvent) {
       :info="state.info"
       :status="state.status"
       :signature="prefsState.signature"
+      :busy="fetching"
       @browse="browse"
       @refresh="refresh"
       @branch="branchFromHead"
       @identity="identityOpen = true"
+      @fetch="doFetch"
+      @push="pushOpen = true"
     />
 
     <div class="body">
@@ -202,6 +216,7 @@ function startDrag(e: MouseEvent) {
       :count="state.count"
       :loading="state.loading"
       :error="state.error"
+      :network="state.network"
     />
 
     <BranchDialog :request="branchRequest" @close="branchRequest = null" />
@@ -212,6 +227,7 @@ function startDrag(e: MouseEvent) {
       :repo-name="state.info?.name ?? ''"
       @close="identityOpen = false"
     />
+    <PushDialog :open="pushOpen" @close="pushOpen = false" />
   </div>
 </template>
 
