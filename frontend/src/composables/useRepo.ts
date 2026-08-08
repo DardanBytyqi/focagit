@@ -1,6 +1,7 @@
 import { reactive } from 'vue'
 import type { git, session } from '@wails/go/models'
 import {
+  AddRemote,
   Checkout,
   CheckoutCommit,
   CreateBranch,
@@ -13,6 +14,7 @@ import {
   OpenRepo,
   Push,
   Refs,
+  RemoveRemote,
   RenameBranch,
   SelectRepo,
   Status,
@@ -187,6 +189,15 @@ async function loadRemotes() {
 
 const fetchAll = (opts: git.FetchOptions) => act((id) => Fetch(id, opts))
 
+/** Adds a remote, then re-reads the list the push dialog offers. */
+async function addRemote(name: string, url: string, fetchNow: boolean): Promise<boolean> {
+  const ok = await act((id) => AddRemote(id, name, url, fetchNow))
+  await loadRemotes()
+  return ok
+}
+
+const removeRemote = (name: string) => act((id) => RemoveRemote(id, name))
+
 /**
  * Pushes and returns what the remote made of each ref, or null when it refused.
  * The refusal is left in state.error, as with every other write.
@@ -223,6 +234,8 @@ export function useRepo() {
     deleteBranch,
     renameBranch,
     loadRemotes,
+    addRemote,
+    removeRemote,
     fetchAll,
     push,
   }

@@ -262,6 +262,14 @@ func (r *Repo) Remotes(ctx context.Context) ([]git.Remote, error) {
 	return r.git.Remotes(ctx)
 }
 
+func (r *Repo) AddRemote(ctx context.Context, name, url string) error {
+	return r.git.AddRemote(ctx, name, url)
+}
+
+func (r *Repo) RemoveRemote(ctx context.Context, name string) error {
+	return r.git.RemoveRemote(ctx, name)
+}
+
 func (r *Repo) Fetch(ctx context.Context, opts git.FetchOptions, onProgress func(string)) error {
 	return r.git.Fetch(ctx, opts, onProgress)
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -436,6 +437,41 @@ func (a *App) GetRemotes(id string) ([]git.Remote, error) {
 		list = []git.Remote{}
 	}
 	return list, nil
+}
+
+// AddRemote records a remote and, if asked, fetches from it straight away —
+// which is the only thing that proves the URL was not a typo.
+func (a *App) AddRemote(id, name, url string, fetchNow bool) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.AddRemote(a.ctx, name, url); err != nil {
+		return err
+	}
+	if !fetchNow {
+		return nil
+	}
+
+	// The remote stays even if the fetch fails: the URL may be right and the
+	// network wrong, and silently undoing the user's work would be worse.
+	if err := a.Fetch(id, git.FetchOptions{Remote: name}); err != nil {
+		return fmt.Errorf("%s was added, but fetching from it failed: %w", name, err)
+	}
+	return nil
+}
+
+// RemoveRemote forgets a remote, then rewalks: its branches are gone from the graph.
+func (a *App) RemoveRemote(id, name string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.RemoveRemote(a.ctx, name); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
 }
 
 // report emits one network progress line to the frontend.

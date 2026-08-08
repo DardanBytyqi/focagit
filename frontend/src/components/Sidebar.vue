@@ -22,6 +22,7 @@ const emit = defineEmits<{
   create: [start: string, label: string]
   rename: [name: string]
   remove: [name: string]
+  addRemote: []
 }>()
 
 // Only branches can be checked out directly; a tag would detach HEAD.
@@ -68,6 +69,14 @@ function toggle(key: string) {
         <span class="chevron" :class="{ closed: collapsed[s.key] }">▾</span>
         {{ s.title }}
         <span class="count muted">{{ s.refs.length }}</span>
+        <button
+          v-if="s.key === 'remote'"
+          class="add"
+          title="Add a remote"
+          @click.stop="emit('addRemote')"
+        >
+          +
+        </button>
       </div>
 
       <div v-show="!collapsed[s.key]">
@@ -185,6 +194,19 @@ function toggle(key: string) {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   cursor: default;
+}
+
+/* Pushed to the right edge, and only there when the pointer is. */
+.section-header .add {
+  margin-left: auto;
+  padding: 0 5px;
+  line-height: 1;
+  color: var(--text-dim);
+  visibility: hidden;
+}
+
+.section-header:hover .add {
+  visibility: visible;
 }
 
 .chevron {

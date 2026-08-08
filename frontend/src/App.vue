@@ -9,6 +9,7 @@ import CommitList from '@/components/CommitList.vue'
 import DeleteBranchDialog from '@/components/DeleteBranchDialog.vue'
 import IdentityDialog from '@/components/IdentityDialog.vue'
 import PushDialog from '@/components/PushDialog.vue'
+import RemoteDialog from '@/components/RemoteDialog.vue'
 import RecentList from '@/components/RecentList.vue'
 import Sidebar from '@/components/Sidebar.vue'
 import StatusBar from '@/components/StatusBar.vue'
@@ -22,6 +23,7 @@ const { state: prefsState, loadSignature } = usePrefs()
 
 const identityOpen = ref(false)
 const pushOpen = ref(false)
+const remoteOpen = ref(false)
 const fetching = ref(false)
 
 // Pruning on every fetch: a remote branch that is gone stays listed otherwise,
@@ -153,6 +155,7 @@ function startDrag(e: MouseEvent) {
         @create="newBranch"
         @rename="renameBranch"
         @remove="deleteRequest = { name: $event }"
+        @add-remote="remoteOpen = true"
       />
 
       <main class="main">
@@ -228,6 +231,7 @@ function startDrag(e: MouseEvent) {
       @close="identityOpen = false"
     />
     <PushDialog :open="pushOpen" @close="pushOpen = false" />
+    <RemoteDialog :open="remoteOpen" @close="remoteOpen = false" />
   </div>
 </template>
 

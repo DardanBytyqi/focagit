@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import Check from '@/components/Check.vue'
 import Modal from '@/components/Modal.vue'
+import RemoteForm from '@/components/RemoteForm.vue'
 import { useRepo } from '@/composables/useRepo'
 import { isRejected, isStaleInfo } from '@/utils/errors'
 
@@ -14,8 +15,15 @@ const remote = ref('')
 const setUpstream = ref(true)
 const force = ref(false)
 const busy = ref(false)
+const adding = ref(false)
 /** What the remote said about each ref, shown instead of closing on success. */
 const done = ref<string[]>([])
+
+/** A freshly added remote is the one you meant to push to. */
+function onAdded(name: string) {
+  adding.value = false
+  remote.value = name
+}
 
 const isOpen = computed({
   get: () => props.open,
@@ -35,6 +43,7 @@ watch(
     state.error = ''
     done.value = []
     force.value = false
+    adding.value = false
     await loadRemotes()
     remote.value = state.remotes[0]?.name ?? ''
     setUpstream.value = !upstream.value
@@ -62,6 +71,21 @@ async function submit() {
       <p class="hint">HEAD is detached, so there is no branch to push. Create one first.</p>
     </template>
 
+    <!-- Nowhere to push yet: the way out is here, not in a terminal. -->
+    <template v-else-if="adding || !state.remotes.length">
+      <p class="lead">
+        <template v-if="state.remotes.length">Where should this go?</template>
+        <template v-else>
+          This repository has no remote yet, so there is nowhere to push. Add one.
+        </template>
+      </p>
+      <RemoteForm
+        :active="isOpen && (adding || !state.remotes.length)"
+        @added="onAdded"
+        @cancel="adding ? (adding = false) : emit('close')"
+      />
+    </template>
+
     <template v-else>
       <p class="lead">
         Pushing <b>{{ branch }}</b>
@@ -76,11 +100,7 @@ async function submit() {
           {{ r.name }} — {{ r.push || r.fetch }}
         </option>
       </select>
-
-      <p v-if="!state.remotes.length" class="hint warn">
-        This repository has no remote yet. Add one with
-        <span class="mono">git remote add origin &lt;url&gt;</span>.
-      </p>
+      <button type="button" class="add-link" @click="adding = true">+ Add another remote</button>
 
       <Check v-model="setUpstream" :disabled="!!upstream && !force">
         Track this remote branch from now on
@@ -137,8 +157,19 @@ async function submit() {
   margin-bottom: 4px;
 }
 
-.warn {
-  color: var(--amber);
+.add-link {
+  margin-top: 2px;
+  padding: 2px 0;
+  color: var(--accent);
+  background: none;
+  border: none;
+  font-size: var(--fs-small);
+}
+
+.add-link:hover {
+  background: none;
+  border: none;
+  text-decoration: underline;
 }
 
 .results {

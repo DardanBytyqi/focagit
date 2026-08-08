@@ -86,6 +86,73 @@ func TestRemotes(t *testing.T) {
 	}
 }
 
+func TestAddRemote(t *testing.T) {
+	origin, _, _ := netRepos(t)
+	repo := branchRepo(t)
+	ctx := context.Background()
+
+	t.Run("adding one makes it fetchable", func(t *testing.T) {
+		if err := repo.AddRemote(ctx, "origin", origin); err != nil {
+			t.Fatalf("AddRemote: %v", err)
+		}
+		list, err := repo.Remotes(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(list) != 1 || list[0].Name != "origin" || list[0].Fetch != origin {
+			t.Fatalf("remotes = %+v", list)
+		}
+		if err := repo.Fetch(ctx, FetchOptions{Remote: "origin"}, nil); err != nil {
+			t.Errorf("Fetch from the remote just added: %v", err)
+		}
+	})
+
+	t.Run("the same name twice is refused", func(t *testing.T) {
+		if err := repo.AddRemote(ctx, "origin", origin); !errors.Is(err, ErrRemoteExists) {
+			t.Errorf("AddRemote: got %v, want ErrRemoteExists", err)
+		}
+	})
+
+	t.Run("names git would not accept are refused", func(t *testing.T) {
+		for _, name := range []string{"", "  ", "ha spazi", "-trattino"} {
+			if err := repo.AddRemote(ctx, name, origin); !errors.Is(err, ErrInvalidRemoteName) {
+				t.Errorf("AddRemote(%q): got %v, want ErrInvalidRemoteName", name, err)
+			}
+		}
+	})
+
+	t.Run("an empty url is refused before git sees it", func(t *testing.T) {
+		if err := repo.AddRemote(ctx, "vuoto", "  "); !errors.Is(err, ErrInvalidRemoteName) {
+			t.Errorf("AddRemote: got %v, want ErrInvalidRemoteName", err)
+		}
+	})
+
+	t.Run("a url that goes nowhere is accepted, and only fetching finds out", func(t *testing.T) {
+		// This is git's own behaviour, and the reason the dialog fetches straight away.
+		if err := repo.AddRemote(ctx, "rotto", "/non/esiste"); err != nil {
+			t.Fatalf("AddRemote: %v", err)
+		}
+		if err := repo.Fetch(ctx, FetchOptions{Remote: "rotto"}, nil); !errors.Is(err, ErrNoRemote) {
+			t.Errorf("Fetch: got %v, want ErrNoRemote", err)
+		}
+	})
+
+	t.Run("removing drops it", func(t *testing.T) {
+		if err := repo.RemoveRemote(ctx, "rotto"); err != nil {
+			t.Fatalf("RemoveRemote: %v", err)
+		}
+		list, err := repo.Remotes(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, rem := range list {
+			if rem.Name == "rotto" {
+				t.Error("the remote survived removal")
+			}
+		}
+	})
+}
+
 func TestPush(t *testing.T) {
 	_, ours, theirs := netRepos(t)
 	ctx := context.Background()

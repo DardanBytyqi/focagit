@@ -18,6 +18,10 @@ var (
 	ErrStaleInfo = errors.New("remote has changed since the last fetch")
 	// ErrAuth means git could not prove who we are.
 	ErrAuth = errors.New("authentication failed")
+	// ErrRemoteExists means a remote by that name is already configured.
+	ErrRemoteExists = errors.New("remote already exists")
+	// ErrInvalidRemoteName means git will not accept the name.
+	ErrInvalidRemoteName = errors.New("invalid remote name")
 )
 
 // Remote is a named place to fetch from and push to.
@@ -64,6 +68,44 @@ func (r *Repo) Remotes(ctx context.Context) ([]Remote, error) {
 		}
 	}
 	return list, nil
+}
+
+// AddRemote records a place to fetch from and push to. Note that git does not
+// check the URL here at all: only a fetch can tell you whether it was a typo.
+func (r *Repo) AddRemote(ctx context.Context, name, url string) error {
+	name = strings.TrimSpace(name)
+	url = strings.TrimSpace(url)
+	if url == "" {
+		return fmt.Errorf("%w: the url is empty", ErrInvalidRemoteName)
+	}
+	// git would read a leading dash as an option, and so would every later command.
+	if name == "" || strings.HasPrefix(name, "-") {
+		return fmt.Errorf("%w: %q", ErrInvalidRemoteName, name)
+	}
+
+	_, err := r.run.outputQuiet(ctx, "remote", "add", "--", name, url)
+	return classifyRemoteName(err, name)
+}
+
+// RemoveRemote forgets a remote and the remote-tracking branches that came with it.
+func (r *Repo) RemoveRemote(ctx context.Context, name string) error {
+	_, err := r.run.output(ctx, "remote", "remove", "--", name)
+	return err
+}
+
+// classifyRemoteName turns git's refusals about the name into sentinels.
+func classifyRemoteName(err error, name string) error {
+	var ce *CommandError
+	if !errors.As(err, &ce) {
+		return err
+	}
+	switch {
+	case strings.Contains(ce.Stderr, "already exists"):
+		return fmt.Errorf("%s: %w", name, ErrRemoteExists)
+	case strings.Contains(ce.Stderr, "is not a valid remote name"):
+		return fmt.Errorf("%w: %q", ErrInvalidRemoteName, name)
+	}
+	return err
 }
 
 // FetchOptions says what to bring down and what to tidy up while doing it.
