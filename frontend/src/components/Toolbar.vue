@@ -35,6 +35,22 @@ const pending = ['Pull', 'Merge', 'Stash']
 // A branch nobody has pushed yet has nothing to compare against, so "up to date"
 // would be a lie; the push dialog is still the way to publish it.
 const ahead = computed(() => props.status?.ahead ?? 0)
+
+// An upstream is nearly always "origin/" plus the branch you are already reading
+const upstreamLabel = computed(() => {
+  const st = props.status
+  if (!st?.upstream) return ''
+  const suffix = '/' + st.head
+  return st.upstream.endsWith(suffix) ? st.upstream.slice(0, -suffix.length) : st.upstream
+})
+
+/** The full names, for when the shortened ones are not enough. */
+const branchTitle = computed(() => {
+  const st = props.status
+  if (!st) return ''
+  const head = st.detached ? 'detached HEAD' : st.head
+  return st.upstream ? `${head} → ${st.upstream}` : head
+})
 </script>
 
 <template>
@@ -90,13 +106,11 @@ const ahead = computed(() => props.status?.ahead ?? 0)
 
     <span v-if="info" class="sep"></span>
 
-    <div v-if="status" class="branch">
+    <div v-if="status" class="branch" :title="branchTitle">
       <span class="branch-name">{{ status.detached ? 'detached HEAD' : status.head }}</span>
-      <span v-if="status.upstream" class="tracking muted mono">
-        {{ status.upstream }}
-        <span v-if="status.ahead" class="ahead">↑{{ status.ahead }}</span>
-        <span v-if="status.behind" class="behind">↓{{ status.behind }}</span>
-      </span>
+      <span v-if="status.upstream" class="tracking muted mono">{{ upstreamLabel }}</span>
+      <span v-if="status.ahead" class="ahead">↑{{ status.ahead }}</span>
+      <span v-if="status.behind" class="behind">↓{{ status.behind }}</span>
     </div>
   </div>
 </template>
@@ -110,6 +124,12 @@ const ahead = computed(() => props.status?.ahead ?? 0)
   padding: 0 10px;
   background: var(--bg-toolbar);
   border-bottom: 1px solid var(--border);
+  flex: none;
+}
+
+/* Buttons and separators keep their size; only the names shrink. */
+.toolbar > button,
+.sep {
   flex: none;
 }
 
@@ -139,6 +159,8 @@ const ahead = computed(() => props.status?.ahead ?? 0)
   align-items: center;
   gap: 6px;
   max-width: 260px;
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: var(--fs-small);
   color: var(--text-muted);
   overflow: hidden;
@@ -154,8 +176,6 @@ const ahead = computed(() => props.status?.ahead ?? 0)
   flex: none;
 }
 
-/* Amber, not red: inheriting the global identity is normal, it is just the
-   thing you want to notice before committing under the wrong address. */
 .identity.inherited .dot {
   background: var(--amber);
 }
@@ -164,19 +184,37 @@ const ahead = computed(() => props.status?.ahead ?? 0)
   background: var(--red);
 }
 
+
 .branch {
   display: flex;
   align-items: baseline;
   gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.branch-name,
+.tracking {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .branch-name {
+  flex: 1 1 auto;
   font-weight: 600;
   color: var(--green);
 }
 
 .tracking {
+  flex: 0 1 auto;
   font-size: var(--fs-small);
+}
+
+.ahead,
+.behind {
+  flex: none;
 }
 
 .ahead {
