@@ -1,0 +1,410 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"os"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+
+	"github.com/dardanbytyqi/focagit/internal/git"
+	"github.com/dardanbytyqi/focagit/internal/patch"
+	"github.com/dardanbytyqi/focagit/internal/prefs"
+	"github.com/dardanbytyqi/focagit/internal/session"
+)
+
+// App is the surface exposed to the frontend.
+type App struct {
+	ctx     context.Context
+	session *session.Session
+	prefs   *prefs.Store
+}
+
+func NewApp() *App {
+	// Preferences are a convenience; not having them must not stop the app.
+	store, err := prefs.Open()
+	if err != nil {
+		slog.Warn("preferences unavailable", slog.String("err", err.Error()))
+	}
+	return &App{session: session.New(), prefs: store}
+}
+
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
+}
+
+// InitialRepo returns FOCAGIT_OPEN, which lets dev builds skip the welcome screen.
+func (a *App) InitialRepo() string { return os.Getenv("FOCAGIT_OPEN") }
+
+// InitialView is the companion knob.
+func (a *App) InitialView() string { return os.Getenv("FOCAGIT_VIEW") }
+
+// Progress is pushed to the frontend as the history streams in.
+type Progress struct {
+	ID string `json:"id"`
+	// Gen changes on every reload, telling the frontend its cached pages are stale.
+	Gen    int    `json:"gen"`
+	Loaded int    `json:"loaded"`
+	Width  int    `json:"width"`
+	Done   bool   `json:"done"`
+	Error  string `json:"error,omitempty"`
+}
+
+// OpenRepo registers a repository and starts loading its history in the background.
+func (a *App) OpenRepo(path string) (session.Info, error) {
+	repo, err := a.session.Open(a.ctx, path)
+	if err != nil {
+		return session.Info{}, err
+	}
+
+	a.reload(repo)
+	if a.prefs != nil {
+		if err := a.prefs.Remember(repo.Info.Path, repo.Info.Name); err != nil {
+			slog.Warn("could not save the recent list", slog.String("err", err.Error()))
+		}
+	}
+	return repo.Info, nil
+}
+
+// reload walks the history again in the background, reporting progress as it goes.
+func (a *App) reload(repo *session.Repo) {
+	go func() {
+		err := repo.Load(a.ctx, func(gen, loaded, width int, done bool) {
+			runtime.EventsEmit(a.ctx, "repo:progress", Progress{
+				ID: repo.Info.ID, Gen: gen, Loaded: loaded, Width: width, Done: done,
+			})
+		})
+		if err != nil {
+			runtime.EventsEmit(a.ctx, "repo:progress", Progress{
+				ID: repo.Info.ID, Gen: repo.Gen(), Done: true, Error: err.Error(),
+			})
+		}
+	}()
+}
+
+// PathInfo answers what a folder is before we try to open it as a repository.
+type PathInfo struct {
+	Path   string `json:"path"`
+	Exists bool   `json:"exists"`
+	IsDir  bool   `json:"isDir"`
+	IsRepo bool   `json:"isRepo"`
+}
+
+// Inspect classifies a path so the UI can offer to initialise it rather than
+// only reporting that it is not a repository.
+func (a *App) Inspect(path string) PathInfo {
+	info := PathInfo{Path: path}
+
+	st, err := os.Stat(path)
+	if err != nil {
+		return info
+	}
+	info.Exists = true
+	info.IsDir = st.IsDir()
+
+	if _, err := git.Open(a.ctx, path); err == nil {
+		info.IsRepo = true
+	}
+	return info
+}
+
+// InitRepo runs `git init` in path and opens the result.
+func (a *App) InitRepo(path string) (session.Info, error) {
+	if err := git.Init(a.ctx, path); err != nil {
+		return session.Info{}, err
+	}
+	return a.OpenRepo(path)
+}
+
+// SelectRepo opens the native directory picker and returns the chosen path, or an empty.
+func (a *App) SelectRepo() (string, error) {
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Open repository",
+	})
+}
+
+// CloseRepo cancels any in-flight load and drops the cache.
+func (a *App) CloseRepo(id string) { a.session.Close(id) }
+
+// ListRepos returns the currently open repositories.
+func (a *App) ListRepos() []session.Info { return a.session.List() }
+
+// History describes the cached history: how much of it there is and which walk built it.
+type History struct {
+	Gen   int `json:"gen"`
+	Count int `json:"count"`
+	Width int `json:"width"`
+}
+
+// GetHistory is one call for everything the commit list needs to size itself.
+func (a *App) GetHistory(id string) (History, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return History{}, err
+	}
+	return History{Gen: repo.Gen(), Count: repo.Count(), Width: repo.GraphWidth()}, nil
+}
+
+// CommitRange returns one page of history, each entry with its commit and graph row.
+func (a *App) CommitRange(id string, offset, count int) ([]session.Entry, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	return repo.Range(offset, count), nil
+}
+
+// Refs lists branches, remotes and tags for the sidebar.
+func (a *App) Refs(id string) ([]git.Ref, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	return repo.Refs(a.ctx)
+}
+
+// CommitFiles lists the files a commit changed, for the detail pane.
+func (a *App) CommitFiles(id, hash string) ([]git.FileChange, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	return repo.CommitFiles(a.ctx, hash)
+}
+
+// Diff returns the patch for one file, either inside a commit or in the working tree.
+func (a *App) Diff(id string, target git.DiffTarget) (git.FileDiff, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.FileDiff{}, err
+	}
+	return repo.Diff(a.ctx, target)
+}
+
+// Status is the working tree state shown in the Changes row and status bar.
+func (a *App) Status(id string) (git.Status, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.Status{}, err
+	}
+	return repo.Status(a.ctx)
+}
+
+// --- Changes view: everything below writes to the repository ----------------
+
+// WorkingDiff returns the diff for one working tree path, handling untracked files.
+func (a *App) WorkingDiff(id, path string, staged, untracked bool) (git.FileDiff, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.FileDiff{}, err
+	}
+	return repo.WorkingDiff(a.ctx, path, staged, untracked)
+}
+
+func (a *App) StageFiles(id string, paths []string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	return repo.Stage(a.ctx, paths...)
+}
+
+func (a *App) UnstageFiles(id string, paths []string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	return repo.Unstage(a.ctx, paths...)
+}
+
+// DiscardFiles throws working tree changes away.
+func (a *App) DiscardFiles(id string, paths []string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	return repo.Discard(a.ctx, paths...)
+}
+
+// StageLines stages or unstages a selection of lines within one file.
+func (a *App) StageLines(id, path string, refs []patch.LineRef, unstage bool) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	return repo.StageLines(a.ctx, path, refs, unstage)
+}
+
+// DiscardLines throws away a selection of working tree lines.
+func (a *App) DiscardLines(id, path string, refs []patch.LineRef) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	return repo.DiscardLines(a.ctx, path, refs)
+}
+
+// Commit records the staged changes, then reloads the history because the new commit.
+func (a *App) Commit(id, message string, amend bool) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.Commit(a.ctx, git.CommitOptions{Message: message, Amend: amend}); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// --- recent repositories -----------------------------------------------------
+
+// RecentRepos lists what the welcome screen offers, newest first.
+func (a *App) RecentRepos() []prefs.Recent {
+	if a.prefs == nil {
+		return []prefs.Recent{}
+	}
+	return a.prefs.Recents()
+}
+
+// ForgetRepo drops one entry from the recent list.
+func (a *App) ForgetRepo(path string) error {
+	if a.prefs == nil {
+		return nil
+	}
+	return a.prefs.Forget(path)
+}
+
+// --- identities ---------------------------------------------------------------
+
+// IdentityState is everything the identity dialog shows, in one call.
+type IdentityState struct {
+	// Current is who the next commit here would be attributed to.
+	Current git.Signature `json:"current"`
+	// Global is what this repository falls back to when it sets nothing.
+	Global git.Signature    `json:"global"`
+	Saved  []prefs.Identity `json:"saved"`
+}
+
+// GetIdentityState reads the repository's identity, the global one, and the saved list.
+func (a *App) GetIdentityState(id string) (IdentityState, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return IdentityState{}, err
+	}
+
+	st := IdentityState{Saved: []prefs.Identity{}}
+	if st.Current, err = repo.Git().Signature(a.ctx); err != nil {
+		return st, err
+	}
+	if st.Global, err = repo.Git().GlobalSignature(a.ctx); err != nil {
+		return st, err
+	}
+	if a.prefs != nil {
+		st.Saved = a.prefs.Identities()
+	}
+	return st, nil
+}
+
+// Signature is who git would attribute the next commit in this repository to.
+func (a *App) Signature(id string) (git.Signature, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.Signature{}, err
+	}
+	return repo.Git().Signature(a.ctx)
+}
+
+// AddIdentity saves an identity, replacing any earlier one with the same email.
+func (a *App) AddIdentity(ident prefs.Identity) error {
+	if a.prefs == nil {
+		return errors.New("preferences are unavailable")
+	}
+	_, err := a.prefs.AddIdentity(ident)
+	return err
+}
+
+// RemoveIdentity forgets a saved identity; repositories already using it keep it.
+func (a *App) RemoveIdentity(email string) error {
+	if a.prefs == nil {
+		return errors.New("preferences are unavailable")
+	}
+	return a.prefs.RemoveIdentity(email)
+}
+
+// ApplyIdentity writes a name and email into this repository's own config.
+func (a *App) ApplyIdentity(id string, ident prefs.Identity) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	return repo.Git().SetSignature(a.ctx, ident.Name, ident.Email)
+}
+
+// ClearIdentity drops the repository's own identity so the global one applies.
+func (a *App) ClearIdentity(id string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	return repo.Git().ClearSignature(a.ctx)
+}
+
+// --- branches ---------------------------------------------------------------
+
+// Checkout switches to a local branch, or to the local branch behind a remote one.
+func (a *App) Checkout(id string, ref git.Ref) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if ref.Kind == git.RefRemote {
+		return repo.CheckoutRemote(a.ctx, ref.Short)
+	}
+	return repo.Checkout(a.ctx, ref.Short)
+}
+
+// CheckoutCommit detaches HEAD onto a commit, as double-clicking a row does in Fork.
+func (a *App) CheckoutCommit(id, hash string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	return repo.CheckoutDetached(a.ctx, hash)
+}
+
+// CreateBranch adds a branch, reloading the history because a new tip may be reachable.
+func (a *App) CreateBranch(id string, opts git.CreateBranchOptions) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.CreateBranch(a.ctx, opts); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// DeleteBranch removes a branch; deleting a tip can make commits unreachable, so reload.
+func (a *App) DeleteBranch(id, name string, force bool) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.DeleteBranch(a.ctx, name, force); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// RenameBranch renames a branch; the commits it points at do not move.
+func (a *App) RenameBranch(id, from, to string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	return repo.RenameBranch(a.ctx, from, to)
+}

@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    // vite.config.ts runs in Node, not in the browser: it needs Node's globals
+    // and its own lib, neither of which it was getting.
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext"],
+    "types": ["node"],
+
+    // No "composite": project references would buy nothing across two config
+    // files, and a referenced project is not allowed to disable emit — which
+    // is exactly what a type-check-only setup wants to do.
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["vite.config.ts"]
+}

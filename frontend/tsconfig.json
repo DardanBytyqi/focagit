@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    // Vite resolves imports, not tsc. "Node" here means node10, which is
+    // deprecated in TS 5.9 and cannot follow the "exports" maps that modern
+    // packages ship.
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    "useDefineForClassFields": true,
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // vue-tsc only type-checks; Vite does the emitting.
+    "noEmit": true,
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    // Every import is either clearly a type or clearly a value, which is what
+    // lets isolatedModules erase types file by file without guessing.
+    "verbatimModuleSyntax": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+
+    // No "baseUrl": deprecated in TS 5.9, and paths already resolve relative
+    // to this file.
+    "paths": {
+      "@/*": ["./src/*"],
+      "@wails/*": ["./wailsjs/*"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "wailsjs/**/*.ts"
+  ]
+}

@@ -1,0 +1,151 @@
+/* Design tokens. Everything visual references these, so the light theme in
+   stage 7 is a matter of redefining the block rather than hunting colours. */
+:root {
+  --bg: #1e1f22;
+  --bg-raised: #26282c;
+  --bg-toolbar: #2b2d31;
+  --bg-hover: #313439;
+  --bg-selected: #2d4f7c;
+  --border: #3a3d42;
+  --border-strong: #4a4e55;
+
+  --text: #d7d9dd;
+  --text-muted: #8b9096;
+  --text-dim: #6b7076;
+
+  --accent: #4a8cf7;
+  --green: #6cc26c;
+  --red: #e06c6c;
+  --amber: #d9a441;
+  --purple: #b07cd6;
+
+  /* Graph lane colours. There are eight because internal/graph uses a palette
+     of eight; the two only have to agree on the count, not on the values. */
+  --lane-0: #4a8cf7;
+  --lane-1: #6cc26c;
+  --lane-2: #d9a441;
+  --lane-3: #b07cd6;
+  --lane-4: #e06c6c;
+  --lane-5: #46b8b0;
+  --lane-6: #d67ca8;
+  --lane-7: #9aa0a6;
+
+  --row-height: 24px;
+  --sidebar-width: 240px;
+  --toolbar-height: 40px;
+  --statusbar-height: 24px;
+
+  --font: -apple-system, "Segoe UI", "Cantarell", "Noto Sans", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "Noto Sans Mono", monospace;
+  --fs: 13px;
+  --fs-small: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs);
+  /* The webview is the whole window; a text cursor over chrome looks broken. */
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+button:disabled {
+  color: var(--text-dim);
+  cursor: default;
+}
+
+/* Scrollbars: the default GTK webview ones are far too heavy for a dense UI. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 5px;
+  border: 2px solid var(--bg);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+}
+
+/* Menus are teleported to the body, so their styling cannot be scoped. */
+.menu {
+  min-width: 190px;
+  padding: 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+  z-index: 50;
+}
+
+.menu-item {
+  padding: 5px 10px;
+  border-radius: 3px;
+  font-size: var(--fs-small);
+  cursor: default;
+  outline: none;
+}
+
+.menu-item[data-highlighted] {
+  background: var(--bg-selected);
+}
+
+.menu-item[data-disabled] {
+  color: var(--text-dim);
+}
+
+.menu-item.danger[data-highlighted] {
+  background: var(--red);
+  color: #1e1f22;
+}
+
+.menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+}
+
+.muted {
+  color: var(--text-muted);
+}
