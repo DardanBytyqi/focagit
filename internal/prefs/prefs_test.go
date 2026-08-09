@@ -52,8 +52,7 @@ func TestRecents(t *testing.T) {
 	if got[0].Path != "/tre" {
 		t.Errorf("first = %q, want /tre", got[0].Path)
 	}
-	// A folder that is not there any more is flagged, not dropped: the user may
-	// just have an external drive unplugged.
+	// A missing folder is flagged, not dropped: the drive may be unplugged.
 	if !got[2].Missing {
 		t.Errorf("/uno should be flagged missing: %+v", got[2])
 	}
@@ -190,4 +189,31 @@ func TestCorruptFileDoesNotStopTheApp(t *testing.T) {
 	if len(reopen(t, s).Recents()) != 1 {
 		t.Error("the store did not recover")
 	}
+}
+
+func TestAppearance(t *testing.T) {
+	s := store(t)
+
+	// A fresh store has never been written to, so it answers with the default.
+	if got := s.Appearance(); got != DefaultAppearance() {
+		t.Errorf("Appearance() = %+v, want the default", got)
+	}
+
+	want := Appearance{Theme: "light", Density: "compact", FontSize: 15}
+	if err := s.SaveAppearance(want); err != nil {
+		t.Fatalf("SaveAppearance: %v", err)
+	}
+	if got := reopen(t, s).Appearance(); got != want {
+		t.Errorf("Appearance() = %+v, want %+v", got, want)
+	}
+
+	t.Run("values we would not read back are defaulted, not stored", func(t *testing.T) {
+		if err := s.SaveAppearance(Appearance{Theme: "fucsia", Density: "enorme", FontSize: 400}); err != nil {
+			t.Fatal(err)
+		}
+		// A 400px font would make the window unusable and leave no way back.
+		if got := reopen(t, s).Appearance(); got != DefaultAppearance() {
+			t.Errorf("Appearance() = %+v, want the default", got)
+		}
+	})
 }

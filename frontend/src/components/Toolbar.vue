@@ -1,5 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import {
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuRoot,
+  DropdownMenuTrigger,
+} from 'reka-ui'
 import type { git, session } from '@wails/go/models'
 
 const props = defineProps<{
@@ -18,6 +25,7 @@ const emit = defineEmits<{
   fetch: []
   push: []
   pushOptions: []
+  settings: [section: string]
 }>()
 
 // An inherited identity is the one that commits under the wrong address.
@@ -122,6 +130,29 @@ const branchTitle = computed(() => {
       <span v-if="status.ahead" class="ahead">↑{{ status.ahead }}</span>
       <span v-if="status.behind" class="behind">↓{{ status.behind }}</span>
     </div>
+
+    <span v-if="info" class="sep"></span>
+
+    <!-- The machine's settings, past everything the repository owns. -->
+    <DropdownMenuRoot>
+      <DropdownMenuTrigger class="settings" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+          <circle cx="8" cy="8" r="4.6" />
+          <circle cx="8" cy="8" r="1.7" />
+          <g stroke-linecap="round">
+            <path d="M12.6 8h1.6M11.25 11.25l1.13 1.13M8 12.6v1.6M4.75 11.25l-1.13 1.13" />
+            <path d="M3.4 8H1.8M4.75 4.75L3.62 3.62M8 3.4V1.8M11.25 4.75l1.13-1.13" />
+          </g>
+        </svg>
+      </DropdownMenuTrigger>
+      <DropdownMenuPortal>
+        <DropdownMenuContent class="menu" align="end" :side-offset="4">
+          <DropdownMenuItem class="menu-item" @select="emit('settings', 'appearance')">
+            Appearance…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenuPortal>
+    </DropdownMenuRoot>
   </div>
 </template>
 
@@ -140,6 +171,7 @@ const branchTitle = computed(() => {
 /* Buttons and separators keep their size; only the names shrink. */
 .toolbar > button,
 .split,
+.settings,
 .sep {
   flex: none;
 }
@@ -164,6 +196,27 @@ const branchTitle = computed(() => {
 /* One outline around the pair while either half is under the pointer. */
 .split:hover .split-main:not(:disabled),
 .split:hover .split-more:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.settings {
+  display: flex;
+  padding: 4px;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.settings svg {
+  width: 15px;
+  height: 15px;
+}
+
+.settings:hover,
+.settings[data-state='open'] {
+  color: var(--text);
   background: var(--bg-hover);
   border-color: var(--border);
 }

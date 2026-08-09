@@ -92,8 +92,7 @@ type PathInfo struct {
 	IsRepo bool   `json:"isRepo"`
 }
 
-// Inspect classifies a path so the UI can offer to initialise it rather than
-// only reporting that it is not a repository.
+// Inspect classifies a path so the UI can offer to initialise it.
 func (a *App) Inspect(path string) PathInfo {
 	info := PathInfo{Path: path}
 
@@ -439,8 +438,7 @@ func (a *App) GetRemotes(id string) ([]git.Remote, error) {
 	return list, nil
 }
 
-// AddRemote records a remote and, if asked, fetches from it straight away —
-// which is the only thing that proves the URL was not a typo.
+// AddRemote records a remote and, if asked, fetches to prove the URL works.
 func (a *App) AddRemote(id, name, url string, fetchNow bool) error {
 	repo, err := a.session.Get(id)
 	if err != nil {
@@ -453,8 +451,7 @@ func (a *App) AddRemote(id, name, url string, fetchNow bool) error {
 		return nil
 	}
 
-	// The remote stays even if the fetch fails: the URL may be right and the
-	// network wrong, and silently undoing the user's work would be worse.
+	// The remote stays even if the fetch fails: the network may be at fault.
 	if err := a.Fetch(id, git.FetchOptions{Remote: name}); err != nil {
 		return fmt.Errorf("%s was added, but fetching from it failed: %w", name, err)
 	}
@@ -518,4 +515,25 @@ func errText(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+// --- appearance ---------------------------------------------------------------
+
+// GetAppearance is what the window should look like.
+func (a *App) GetAppearance() prefs.Appearance {
+	if a.prefs == nil {
+		return prefs.DefaultAppearance()
+	}
+	return a.prefs.Appearance()
+}
+
+// SaveAppearance stores the look; unrecognised values fall back to the default.
+func (a *App) SaveAppearance(look prefs.Appearance) (prefs.Appearance, error) {
+	if a.prefs == nil {
+		return prefs.DefaultAppearance(), errors.New("preferences are unavailable")
+	}
+	if err := a.prefs.SaveAppearance(look); err != nil {
+		return prefs.DefaultAppearance(), err
+	}
+	return a.prefs.Appearance(), nil
 }

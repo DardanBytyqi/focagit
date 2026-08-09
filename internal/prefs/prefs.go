@@ -1,5 +1,4 @@
-// Package prefs stores what focagit remembers between runs: which repositories
-// were open and which identities the user commits under.
+// Package prefs stores what focagit remembers between runs.
 package prefs
 
 import (
@@ -26,18 +25,51 @@ type Recent struct {
 	Missing bool `json:"missing"`
 }
 
-// Identity is a name and email the user commits under, e.g. work or personal.
-// The email identifies it: two identities with the same address are one.
-// There is no nickname on purpose — the name and the address already are one.
+// Identity is a name and email to commit under; the email identifies it.
 type Identity struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`
+}
+
+// Appearance is what the window looks like; zero means "not chosen yet".
+type Appearance struct {
+	// Theme is dark, light, or system to follow the desktop.
+	Theme string `json:"theme"`
+	// Density scales the row height: compact, normal or roomy.
+	Density string `json:"density"`
+	// FontSize is the base size in pixels; everything else is relative to it.
+	FontSize int `json:"fontSize"`
+}
+
+// DefaultAppearance is what a fresh installation looks like.
+func DefaultAppearance() Appearance {
+	return Appearance{Theme: "dark", Density: "normal", FontSize: 13}
+}
+
+// normalise replaces anything unrecognised with the default.
+func (a Appearance) normalise() Appearance {
+	def := DefaultAppearance()
+	switch a.Theme {
+	case "dark", "light", "system":
+	default:
+		a.Theme = def.Theme
+	}
+	switch a.Density {
+	case "compact", "normal", "roomy":
+	default:
+		a.Density = def.Density
+	}
+	if a.FontSize < 10 || a.FontSize > 20 {
+		a.FontSize = def.FontSize
+	}
+	return a
 }
 
 // Data is the whole persisted file.
 type Data struct {
 	Recents    []Recent   `json:"recents"`
 	Identities []Identity `json:"identities"`
+	Appearance Appearance `json:"appearance"`
 }
 
 // Store is the config file, guarded so the Wails bridge can call it from anywhere.
@@ -87,8 +119,7 @@ func (s *Store) Recents() []Recent {
 
 	out := make([]Recent, 0, len(s.data.Recents))
 	for _, r := range s.data.Recents {
-		// .git is a directory in a normal clone and a file in a worktree, so only
-		// its existence is worth checking.
+		// .git is a directory in a clone and a file in a worktree: only check it exists.
 		_, err := os.Stat(filepath.Join(r.Path, ".git"))
 		r.Missing = err != nil
 		out = append(out, r)
@@ -162,6 +193,22 @@ func (s *Store) AddIdentity(id Identity) (Identity, error) {
 	}
 	s.data.Identities = append(s.data.Identities, id)
 	return id, s.save()
+}
+
+// Appearance returns the stored look, with anything unrecognised defaulted.
+func (s *Store) Appearance() Appearance {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.data.Appearance.normalise()
+}
+
+// SaveAppearance stores the look, refusing to write values it would not read back.
+func (s *Store) SaveAppearance(a Appearance) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.data.Appearance = a.normalise()
+	return s.save()
 }
 
 // RemoveIdentity drops the identity with this email.

@@ -47,6 +47,50 @@
   --z-menu: 150;
 }
 
+/* The light theme. Only colours change: sizes are the same choice either way. */
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-raised: #f6f7f9;
+  --bg-toolbar: #eef0f3;
+  --bg-hover: #e9ebef;
+  --bg-selected: #cfe0f8;
+  --border: #dcdfe4;
+  --border-strong: #bcc1c9;
+
+  --text: #1f2328;
+  --text-muted: #5c6570;
+  --text-dim: #868f99;
+
+  /* Darker than the dark theme's: the same hue on white would not read. */
+  --accent: #1f6feb;
+  --green: #217a3a;
+  --red: #bf2f28;
+  --amber: #8a5a00;
+  --purple: #7743c9;
+
+  --lane-0: #1f6feb;
+  --lane-1: #217a3a;
+  --lane-2: #a06400;
+  --lane-3: #7743c9;
+  --lane-4: #bf2f28;
+  --lane-5: #0f7f78;
+  --lane-6: #b1417c;
+  --lane-7: #5d666f;
+}
+
+/* Density and font size are set on the root by the appearance settings. */
+:root[data-density="compact"] {
+  --row-height: 20px;
+  --toolbar-height: 34px;
+  --statusbar-height: 21px;
+}
+
+:root[data-density="roomy"] {
+  --row-height: 30px;
+  --toolbar-height: 46px;
+  --statusbar-height: 28px;
+}
+
 * {
   box-sizing: border-box;
 }

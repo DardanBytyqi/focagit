@@ -10,21 +10,31 @@ import DeleteBranchDialog from '@/components/DeleteBranchDialog.vue'
 import IdentityDialog from '@/components/IdentityDialog.vue'
 import PushDialog from '@/components/PushDialog.vue'
 import RemoteDialog from '@/components/RemoteDialog.vue'
+import SettingsDialog from '@/components/SettingsDialog.vue'
 import RecentList from '@/components/RecentList.vue'
 import Sidebar from '@/components/Sidebar.vue'
 import StatusBar from '@/components/StatusBar.vue'
 import Toolbar from '@/components/Toolbar.vue'
 import type { BranchRequest, DeleteRequest } from '@/types'
+import { useAppearance } from './composables/useAppearance'
 import { usePrefs } from './composables/usePrefs'
 import { useRepo } from './composables/useRepo'
 
 const { state, open, browse, refresh, initHere, checkout, checkoutCommit, fetchAll, push } =
   useRepo()
 const { state: prefsState, loadSignature } = usePrefs()
+const { loadAppearance } = useAppearance()
 
 const identityOpen = ref(false)
 const pushOpen = ref(false)
 const remoteOpen = ref(false)
+const settingsOpen = ref(false)
+const settingsSection = ref('appearance')
+
+function showSettings(section: string) {
+  settingsSection.value = section
+  settingsOpen.value = true
+}
 const fetching = ref(false)
 const pushing = ref(false)
 
@@ -47,7 +57,9 @@ async function doFetch() {
 watch(() => state.info?.id ?? null, loadSignature, { immediate: true })
 
 /** A message shown inside a dialog does not need repeating at the bottom. */
-const dialogOpen = computed(() => identityOpen.value || pushOpen.value || remoteOpen.value)
+const dialogOpen = computed(
+  () => identityOpen.value || pushOpen.value || remoteOpen.value || settingsOpen.value,
+)
 
 // One dialog at a time; null means closed.
 const branchRequest = ref<BranchRequest | null>(null)
@@ -103,6 +115,9 @@ onMounted(async () => {
     state.error = 'the Go bindings never became available'
     return
   }
+  // Before anything is shown, so the window does not flash the wrong theme.
+  await loadAppearance()
+
   const path = await InitialRepo()
   if (path) await open(path)
   if ((await InitialView()) === 'changes') setMode('changes')
@@ -155,6 +170,7 @@ function startDrag(e: MouseEvent) {
       @fetch="doFetch"
       @push="doPush"
       @push-options="pushOpen = true"
+      @settings="showSettings"
     />
 
     <div class="body">
@@ -244,6 +260,11 @@ function startDrag(e: MouseEvent) {
       @close="identityOpen = false"
     />
     <PushDialog :open="pushOpen" @close="pushOpen = false" />
+    <SettingsDialog
+      :open="settingsOpen"
+      :section="settingsSection"
+      @close="settingsOpen = false"
+    />
     <RemoteDialog :open="remoteOpen" @close="remoteOpen = false" />
   </div>
 </template>
