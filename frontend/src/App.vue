@@ -35,6 +35,12 @@ function showSettings(section: string) {
   settingsSection.value = section
   settingsOpen.value = true
 }
+
+// One dialog at a time: the push one steps aside rather than stacking.
+function showSSH() {
+  pushOpen.value = false
+  showSettings('ssh')
+}
 const fetching = ref(false)
 const pushing = ref(false)
 
@@ -259,7 +265,7 @@ function startDrag(e: MouseEvent) {
       :repo-name="state.info?.name ?? ''"
       @close="identityOpen = false"
     />
-    <PushDialog :open="pushOpen" @close="pushOpen = false" />
+    <PushDialog :open="pushOpen" @close="pushOpen = false" @ssh="showSSH" />
     <SettingsDialog
       :open="settingsOpen"
       :section="settingsSection"

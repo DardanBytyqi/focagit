@@ -2,12 +2,14 @@
 import { computed, ref, watch } from 'vue'
 import Check from '@/components/Check.vue'
 import Modal from '@/components/Modal.vue'
+import Select from '@/components/Select.vue'
 import RemoteForm from '@/components/RemoteForm.vue'
+import TrustHost from '@/components/TrustHost.vue'
 import { useRepo } from '@/composables/useRepo'
-import { isRejected, isStaleInfo } from '@/utils/errors'
+import { isAuthFailure, isRejected, isStaleInfo, isUnknownHost, remoteHost } from '@/utils/errors'
 
 const props = defineProps<{ open: boolean }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; ssh: [] }>()
 
 const { state, loadRemotes, push } = useRepo()
 
@@ -36,11 +38,30 @@ const isOpen = computed({
 const branch = computed(() => (state.status?.detached ? '' : (state.status?.head ?? '')))
 const upstream = computed(() => state.status?.upstream ?? '')
 
+const remoteOptions = computed(() =>
+  state.remotes.map((r) => ({ value: r.name, label: r.name, hint: r.push || r.fetch })),
+)
+
+/** The server behind the chosen remote, for talking about it by name. */
+const host = computed(() => {
+  const r = state.remotes.find((x) => x.name === remote.value)
+  return remoteHost(r?.push || r?.fetch || '') || 'the server'
+})
+
+/** git's own words, unless we have clearer ones and something to do about it. */
+const problem = computed(() => {
+  const e = state.error
+  if (!e) return null
+  if (isRejected(e)) return { text: e, hint: 'Fetch first and see what arrived.' }
+  if (isStaleInfo(e)) return { text: e, hint: 'The remote moved. Fetch again.' }
+  return { text: e, hint: '' }
+})
+
 watch(
   () => props.open,
   async (open) => {
     if (!open) return
-    state.error = ''
+    // The error stays: the dialog is often opened because of one.
     done.value = []
     force.value = false
     adding.value = false
@@ -49,6 +70,12 @@ watch(
     setUpstream.value = !upstream.value
   },
 )
+
+/** Trusting the server was the only thing missing, so finish the push. */
+async function retryAfterTrust() {
+  state.error = ''
+  await submit()
+}
 
 async function submit() {
   if (!branch.value || busy.value) return
@@ -68,16 +95,14 @@ async function submit() {
 <template>
   <Modal v-model:open="isOpen" title="Push">
     <template v-if="state.status?.detached">
-      <p class="hint">HEAD is detached, so there is no branch to push. Create one first.</p>
+      <p class="hint">HEAD is detached: there is no branch to push.</p>
     </template>
 
     <!-- Nowhere to push yet: the way out is here, not in a terminal. -->
     <template v-else-if="adding || !state.remotes.length">
       <p class="lead">
         <template v-if="state.remotes.length">Where should this go?</template>
-        <template v-else>
-          This repository has no remote yet, so there is nowhere to push. Add one.
-        </template>
+        <template v-else>No remote yet — add one.</template>
       </p>
       <RemoteForm
         :active="isOpen && (adding || !state.remotes.length)"
@@ -86,7 +111,7 @@ async function submit() {
       />
     </template>
 
-    <template v-else>
+    <div v-else class="stack">
       <p class="lead">
         Pushing <b>{{ branch }}</b>
         <template v-if="upstream">
@@ -94,37 +119,47 @@ async function submit() {
         </template>
       </p>
 
-      <label for="push-remote">Remote</label>
-      <select id="push-remote" v-model="remote" class="remote">
-        <option v-for="r in state.remotes" :key="r.name" :value="r.name">
-          {{ r.name }} — {{ r.push || r.fetch }}
-        </option>
-      </select>
-      <button type="button" class="add-link" @click="adding = true">+ Add another remote</button>
+      <div class="field">
+        <label>Remote</label>
+        <Select v-model="remote" :options="remoteOptions" />
+        <button type="button" class="add-link" @click="adding = true">+ Add another remote</button>
+      </div>
 
-      <Check v-model="setUpstream" :disabled="!!upstream && !force">
-        Track this remote branch from now on
-      </Check>
-
-      <Check v-model="force">Overwrite the remote branch</Check>
-      <p v-if="force" class="hint">
-        Only if it is still where your last fetch left it, so this cannot silently
-        bury someone else's commits.
-      </p>
+      <div class="field">
+        <Check v-model="setUpstream" :disabled="!!upstream && !force">
+          Track this remote branch from now on
+        </Check>
+        <Check v-model="force">Overwrite the remote branch</Check>
+        <p v-if="force" class="hint">Only if it is still where your last fetch left it.</p>
+      </div>
 
       <ul v-if="done.length" class="results">
         <li v-for="line in done" :key="line" class="mono">{{ line }}</li>
       </ul>
 
-      <p v-if="state.error" class="error">{{ state.error }}</p>
-      <p v-if="isRejected(state.error)" class="hint">
-        Fetch first and look at what arrived. Overwriting is below, if you are sure.
-      </p>
-      <p v-else-if="isStaleInfo(state.error)" class="hint">
-        The remote moved since your last fetch. Fetch again before overwriting.
-      </p>
+      <TrustHost
+        v-if="isUnknownHost(state.error)"
+        :host="host"
+        @trusted="retryAfterTrust"
+      />
+
+      <div v-else-if="problem" class="field">
+        <p class="error">{{ problem.text }}</p>
+        <p v-if="problem.hint" class="hint">{{ problem.hint }}</p>
+        <!-- Over SSH, "who are you" is nearly always a key the agent is not holding. -->
+        <button
+          v-if="isAuthFailure(state.error)"
+          type="button"
+          class="link"
+          @click="emit('ssh')"
+        >
+          Check your SSH keys…
+        </button>
+      </div>
 
       <div class="actions">
+        <button type="button" class="link ssh" @click="emit('ssh')">SSH keys…</button>
+        <span class="spacer"></span>
         <button type="button" @click="emit('close')">{{ done.length ? 'Close' : 'Cancel' }}</button>
         <button
           type="button"
@@ -135,7 +170,7 @@ async function submit() {
           {{ force ? 'Force push' : 'Push' }}
         </button>
       </div>
-    </template>
+    </div>
   </Modal>
 </template>
 
@@ -146,18 +181,8 @@ async function submit() {
   font-size: var(--fs-small);
 }
 
-.remote {
-  width: 100%;
-  padding: 6px 8px;
-  font: inherit;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  margin-bottom: 4px;
-}
-
-.add-link {
+.add-link,
+.link {
   margin-top: 2px;
   padding: 2px 0;
   color: var(--accent);
@@ -166,10 +191,20 @@ async function submit() {
   font-size: var(--fs-small);
 }
 
-.add-link:hover {
+.add-link:hover,
+.link:hover {
   background: none;
   border: none;
   text-decoration: underline;
+}
+
+/* The SSH link sits on the left, away from the button that actually pushes. */
+.actions .spacer {
+  flex: 1;
+}
+
+.actions .ssh {
+  align-self: center;
 }
 
 .results {

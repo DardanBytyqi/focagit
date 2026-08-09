@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 import Check from '@/components/Check.vue'
+import TrustHost from '@/components/TrustHost.vue'
 import { useRepo } from '@/composables/useRepo'
 import { isUnknownHost, remoteHost } from '@/utils/errors'
 
@@ -59,12 +60,13 @@ async function submit() {
 
     <Check v-model="fetchNow">Fetch from it now</Check>
 
-    <p v-if="state.error" class="error">{{ state.error }}</p>
-    <!-- Only the user can check a fingerprint, so this one ends in a terminal. -->
-    <p v-if="isUnknownHost(state.error)" class="hint">
-      Run <span class="mono">ssh -T git@{{ remoteHost(url) || 'github.com' }}</span> once and
-      check the fingerprint.
-    </p>
+    <!-- The remote is already recorded; only the server is still untrusted. -->
+    <TrustHost
+      v-if="isUnknownHost(state.error)"
+      :host="remoteHost(url)"
+      @trusted="emit('added', name.trim())"
+    />
+    <p v-else-if="state.error" class="error">{{ state.error }}</p>
 
     <div class="actions">
       <button type="button" @click="emit('cancel')">Cancel</button>

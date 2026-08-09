@@ -595,3 +595,21 @@ func (a *App) CopyToClipboard(text string) error {
 func (a *App) OpenURL(url string) {
 	runtime.BrowserOpenURL(a.ctx, url)
 }
+
+// ScanHostKeys asks a server for its keys. Nothing is trusted by this call.
+func (a *App) ScanHostKeys(host string) ([]sshkeys.HostKey, error) {
+	store, err := sshkeys.Open()
+	if err != nil {
+		return nil, err
+	}
+	return store.ScanHost(a.ctx, host)
+}
+
+// TrustHostKeys stores the keys the user approved, never a fresh scan.
+func (a *App) TrustHostKeys(host string, keys []sshkeys.HostKey) error {
+	store, err := sshkeys.Open()
+	if err != nil {
+		return err
+	}
+	return store.TrustHost(a.ctx, host, keys)
+}
