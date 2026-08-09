@@ -18,16 +18,25 @@ import type { BranchRequest, DeleteRequest } from '@/types'
 import { usePrefs } from './composables/usePrefs'
 import { useRepo } from './composables/useRepo'
 
-const { state, open, browse, refresh, initHere, checkout, checkoutCommit, fetchAll } = useRepo()
+const { state, open, browse, refresh, initHere, checkout, checkoutCommit, fetchAll, push } =
+  useRepo()
 const { state: prefsState, loadSignature } = usePrefs()
 
 const identityOpen = ref(false)
 const pushOpen = ref(false)
 const remoteOpen = ref(false)
 const fetching = ref(false)
+const pushing = ref(false)
 
-// Pruning on every fetch: a remote branch that is gone stays listed otherwise,
-// and a stale sidebar is worse than a slightly slower fetch.
+/** Push says nothing when it works; the dialog is only for decisions. */
+async function doPush() {
+  pushing.value = true
+  const res = await push({ remote: '', branch: '', setUpstream: false, force: false, tags: false })
+  pushing.value = false
+  if (!res) pushOpen.value = true
+}
+
+// Pruning on every fetch: a stale sidebar is worse than a slower fetch.
 async function doFetch() {
   fetching.value = true
   await fetchAll({ remote: '', prune: true, tags: false })
@@ -36,6 +45,9 @@ async function doFetch() {
 
 // Who commits here is a property of the repository, so it is re-read on every open.
 watch(() => state.info?.id ?? null, loadSignature, { immediate: true })
+
+/** A message shown inside a dialog does not need repeating at the bottom. */
+const dialogOpen = computed(() => identityOpen.value || pushOpen.value || remoteOpen.value)
 
 // One dialog at a time; null means closed.
 const branchRequest = ref<BranchRequest | null>(null)
@@ -135,13 +147,14 @@ function startDrag(e: MouseEvent) {
       :info="state.info"
       :status="state.status"
       :signature="prefsState.signature"
-      :busy="fetching"
+      :busy="fetching || pushing"
       @browse="browse"
       @refresh="refresh"
       @branch="branchFromHead"
       @identity="identityOpen = true"
       @fetch="doFetch"
-      @push="pushOpen = true"
+      @push="doPush"
+      @push-options="pushOpen = true"
     />
 
     <div class="body">
@@ -218,7 +231,7 @@ function startDrag(e: MouseEvent) {
       :status="state.status"
       :count="state.count"
       :loading="state.loading"
-      :error="state.error"
+      :error="dialogOpen ? '' : state.error"
       :network="state.network"
     />
 

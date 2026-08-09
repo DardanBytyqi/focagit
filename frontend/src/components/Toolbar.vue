@@ -17,10 +17,10 @@ const emit = defineEmits<{
   identity: []
   fetch: []
   push: []
+  pushOptions: []
 }>()
 
-// An identity inherited from the global config is the one that commits under the
-// wrong address, so it is worth showing rather than hiding.
+// An inherited identity is the one that commits under the wrong address.
 const inherited = computed(() => props.signature?.emailScope !== 'local')
 
 const who = computed(() => {
@@ -29,12 +29,9 @@ const who = computed(() => {
   return sig.email
 })
 
-// Still to come in stage 6.
-const pending = ['Pull', 'Merge', 'Stash']
-
-// A branch nobody has pushed yet has nothing to compare against, so "up to date"
-// would be a lie; the push dialog is still the way to publish it.
+// How many commits are waiting to go out, and to come in.
 const ahead = computed(() => props.status?.ahead ?? 0)
+const behind = computed(() => props.status?.behind ?? 0)
 
 // An upstream is nearly always "origin/" plus the branch you are already reading
 const upstreamLabel = computed(() => {
@@ -68,23 +65,36 @@ const branchTitle = computed(() => {
       Fetch
     </button>
 
-    <button
-      :disabled="!info || busy"
-      title="Send your commits to a remote"
-      @click="emit('push')"
-    >
-      Push
-      <span v-if="ahead" class="badge">{{ ahead }}</span>
+    <button disabled title="Pull is next">
+      Pull
+      <span v-if="behind" class="badge behind-badge">{{ behind }}</span>
     </button>
+
+    <!-- Push does the obvious thing; the arrow is for when it is not obvious. -->
+    <span class="split">
+      <button
+        class="split-main"
+        :disabled="!info || busy"
+        title="Push to the upstream"
+        @click="emit('push')"
+      >
+        Push
+        <span v-if="ahead" class="badge">{{ ahead }}</span>
+      </button>
+      <button
+        class="split-more"
+        :disabled="!info || busy"
+        title="Push somewhere else, or overwrite"
+        @click="emit('pushOptions')"
+      >
+        ▾
+      </button>
+    </span>
 
     <span class="sep"></span>
 
     <button :disabled="!info" title="Create a branch from HEAD" @click="emit('branch')">
       Branch…
-    </button>
-
-    <button v-for="b in pending" :key="b" disabled :title="`${b} arrives in stage 6`">
-      {{ b }}
     </button>
 
     <span class="spacer"></span>
@@ -129,8 +139,33 @@ const branchTitle = computed(() => {
 
 /* Buttons and separators keep their size; only the names shrink. */
 .toolbar > button,
+.split,
 .sep {
   flex: none;
+}
+
+.split {
+  display: flex;
+}
+
+.split-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.split-more {
+  padding: 4px 5px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* One outline around the pair while either half is under the pointer. */
+.split:hover .split-main:not(:disabled),
+.split:hover .split-more:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border);
 }
 
 .sep {
@@ -144,7 +179,7 @@ const branchTitle = computed(() => {
   flex: 1;
 }
 
-/* How many commits are waiting to go out, on the button that sends them. */
+/* How many commits are waiting, on the button that would move them. */
 .badge {
   margin-left: 5px;
   padding: 0 5px;
@@ -152,6 +187,12 @@ const branchTitle = computed(() => {
   background: var(--accent);
   color: #fff;
   font-size: 11px;
+}
+
+/* Amber like everywhere else, and legible on a disabled button. */
+.badge.behind-badge {
+  background: var(--amber);
+  color: #1e1f22;
 }
 
 .identity {
