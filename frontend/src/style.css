@@ -39,6 +39,12 @@
   --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "Noto Sans Mono", monospace;
   --fs: 13px;
   --fs-small: 12px;
+
+  /* Stacking layers: anything that overlaps picks one of these. */
+  --z-sticky: 1;
+  --z-float: 2;
+  --z-modal: 100;
+  --z-menu: 150;
 }
 
 * {
@@ -111,7 +117,7 @@ button:disabled {
   border: 1px solid var(--border-strong);
   border-radius: 5px;
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
-  z-index: 50;
+  z-index: var(--z-menu);
 }
 
 .menu-item {

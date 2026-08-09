@@ -195,7 +195,7 @@ function sign(kind: string): string {
   right: 14px;
   display: none;
   gap: 4px;
-  z-index: 2;
+  z-index: var(--z-float);
 }
 
 .hunk.armed:hover .hunk-actions {
@@ -223,7 +223,7 @@ function sign(kind: string): string {
   border-top: 1px solid var(--border);
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: var(--z-sticky);
 }
 
 .heading {

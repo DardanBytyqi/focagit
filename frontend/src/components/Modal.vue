@@ -24,6 +24,7 @@ const open = defineModel<boolean>('open', { required: true })
   position: fixed;
   inset: 0;
   background: rgb(0 0 0 / 0.5);
+  z-index: var(--z-modal);
 }
 
 /* inset + auto margins centre on both axes without a transform, which would
@@ -32,6 +33,7 @@ const open = defineModel<boolean>('open', { required: true })
   position: fixed;
   inset: 0;
   margin: auto;
+  z-index: calc(var(--z-modal) + 1);
   width: 380px;
   height: fit-content;
   max-height: 76vh;
