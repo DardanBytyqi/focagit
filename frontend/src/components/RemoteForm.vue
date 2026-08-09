@@ -2,6 +2,7 @@
 import { nextTick, ref, watch } from 'vue'
 import Check from '@/components/Check.vue'
 import { useRepo } from '@/composables/useRepo'
+import { isUnknownHost, remoteHost } from '@/utils/errors'
 
 const props = defineProps<{ active: boolean }>()
 const emit = defineEmits<{ added: [name: string]; cancel: [] }>()
@@ -38,26 +39,32 @@ async function submit() {
 </script>
 
 <template>
-  <form class="remote-form" @submit.prevent="submit">
-    <label for="remote-url">Repository URL</label>
-    <input
-      id="remote-url"
-      ref="first"
-      v-model="url"
-      type="text"
-      placeholder="git@github.com:you/project.git"
-    />
+  <form class="stack" @submit.prevent="submit">
+    <div class="field">
+      <label for="remote-url">Repository URL</label>
+      <input
+        id="remote-url"
+        ref="first"
+        v-model="url"
+        type="text"
+        placeholder="git@github.com:you/project.git"
+      />
+    </div>
 
-    <label for="remote-name">Name</label>
-    <input id="remote-name" v-model="name" type="text" placeholder="origin" />
+    <!-- The first remote is always called origin; asking would be noise. -->
+    <div v-if="state.remotes.length" class="field">
+      <label for="remote-name">Short name</label>
+      <input id="remote-name" v-model="name" type="text" placeholder="upstream" />
+    </div>
 
     <Check v-model="fetchNow">Fetch from it now</Check>
-    <p class="hint">
-      git accepts any URL without checking it, so fetching is what tells you whether
-      you typed it right.
-    </p>
 
     <p v-if="state.error" class="error">{{ state.error }}</p>
+    <!-- Only the user can check a fingerprint, so this one ends in a terminal. -->
+    <p v-if="isUnknownHost(state.error)" class="hint">
+      Run <span class="mono">ssh -T git@{{ remoteHost(url) || 'github.com' }}</span> once and
+      check the fingerprint.
+    </p>
 
     <div class="actions">
       <button type="button" @click="emit('cancel')">Cancel</button>
@@ -68,12 +75,3 @@ async function submit() {
   </form>
 </template>
 
-<style scoped>
-.remote-form label {
-  margin-top: 10px;
-}
-
-.remote-form label:first-child {
-  margin-top: 0;
-}
-</style>

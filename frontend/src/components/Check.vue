@@ -21,8 +21,11 @@ const checked = defineModel<boolean>({ required: true })
 </template>
 
 <style scoped>
+/* Block, not inline: two of these in a row belong on two rows. */
 .checkbox {
-  display: inline-flex;
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
   align-items: center;
   gap: 7px;
   padding: 2px 0;
@@ -30,6 +33,10 @@ const checked = defineModel<boolean>({ required: true })
   background: none;
   font-size: var(--fs-small);
   text-align: left;
+}
+
+.checkbox + .checkbox {
+  margin-top: 6px;
 }
 
 .checkbox:hover:not(:disabled) {

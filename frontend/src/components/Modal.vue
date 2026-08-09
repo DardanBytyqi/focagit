@@ -62,6 +62,29 @@ const open = defineModel<boolean>('open', { required: true })
   color: var(--text-muted);
 }
 
+/* A label and its control, kept together so the gap between groups can be wide. */
+.dialog .field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dialog .field label {
+  margin-bottom: 0;
+}
+
+/* The gap between groups. Forms opt in by carrying this class. */
+.dialog .stack {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+/* The buttons carry their own margin, which lands on top of the gap. */
+.dialog .stack .actions {
+  margin-top: 5px;
+}
+
 .dialog input[type='text'] {
   width: 100%;
   padding: 6px 8px;
