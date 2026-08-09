@@ -13,6 +13,7 @@ import (
 	"github.com/dardanbytyqi/focagit/internal/patch"
 	"github.com/dardanbytyqi/focagit/internal/prefs"
 	"github.com/dardanbytyqi/focagit/internal/session"
+	"github.com/dardanbytyqi/focagit/internal/sshkeys"
 )
 
 // App is the surface exposed to the frontend.
@@ -536,4 +537,61 @@ func (a *App) SaveAppearance(look prefs.Appearance) (prefs.Appearance, error) {
 		return prefs.DefaultAppearance(), err
 	}
 	return a.prefs.Appearance(), nil
+}
+
+// --- ssh keys -----------------------------------------------------------------
+
+// SSHKeys lists the keys in ~/.ssh and says which the agent already holds.
+func (a *App) SSHKeys() ([]sshkeys.Key, error) {
+	store, err := sshkeys.Open()
+	if err != nil {
+		return nil, err
+	}
+	list, err := store.List(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		list = []sshkeys.Key{}
+	}
+	return list, nil
+}
+
+// GenerateSSHKey makes an ed25519 keypair and hands it to the agent.
+func (a *App) GenerateSSHKey(name, comment string) (sshkeys.Key, error) {
+	store, err := sshkeys.Open()
+	if err != nil {
+		return sshkeys.Key{}, err
+	}
+
+	key, err := store.Generate(a.ctx, name, comment)
+	if err != nil {
+		return sshkeys.Key{}, err
+	}
+	// A key nobody loaded is a key git cannot use, but a warning is enough.
+	if err := store.AddToAgent(a.ctx, key.Path); err != nil {
+		slog.Warn("the new key was not loaded into the agent", slog.String("err", err.Error()))
+	} else {
+		key.InAgent = true
+	}
+	return key, nil
+}
+
+// AddSSHKeyToAgent loads an existing key so git can use it without asking.
+func (a *App) AddSSHKeyToAgent(path string) error {
+	store, err := sshkeys.Open()
+	if err != nil {
+		return err
+	}
+	return store.AddToAgent(a.ctx, path)
+}
+
+// CopyToClipboard is how the public key gets out of the app and into GitHub.
+func (a *App) CopyToClipboard(text string) error {
+	return runtime.ClipboardSetText(a.ctx, text)
+}
+
+// OpenURL hands a link to the desktop's browser.
+func (a *App) OpenURL(url string) {
+	runtime.BrowserOpenURL(a.ctx, url)
 }

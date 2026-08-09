@@ -150,6 +150,9 @@ const branchTitle = computed(() => {
           <DropdownMenuItem class="menu-item" @select="emit('settings', 'appearance')">
             Appearance…
           </DropdownMenuItem>
+          <DropdownMenuItem class="menu-item" @select="emit('settings', 'ssh')">
+            SSH keys…
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenuPortal>
     </DropdownMenuRoot>
