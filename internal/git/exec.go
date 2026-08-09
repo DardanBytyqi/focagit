@@ -22,12 +22,18 @@ type runner struct {
 
 // env returns the environment every git child process inherits.
 func env() []string {
-	return append(os.Environ(),
+	out := append(os.Environ(),
 		"LC_ALL=C",              // stable, parseable messages regardless of locale
 		"GIT_PAGER=cat",         // never hand output to less and hang forever
 		"GIT_TERMINAL_PROMPT=0", // fail fast instead of blocking on a credential prompt
 		"GIT_OPTIONAL_LOCKS=0",  // read-only commands must not take index.lock
 	)
+
+	// GIT_TERMINAL_PROMPT misses ssh, which asks on /dev/tty and blocks forever.
+	if os.Getenv("GIT_SSH_COMMAND") == "" {
+		out = append(out, "GIT_SSH_COMMAND=ssh -o BatchMode=yes")
+	}
+	return out
 }
 
 func (r runner) command(ctx context.Context, args ...string) *exec.Cmd {
@@ -136,8 +142,7 @@ func (r runner) input(ctx context.Context, stdin string, args ...string) ([]byte
 	return stdout.Bytes(), nil
 }
 
-// progress runs git, returns its stdout, and hands each stderr line to fn as it
-// arrives. Network commands report how far along they are on stderr.
+// progress runs git and hands each stderr line to fn as it arrives.
 func (r runner) progress(ctx context.Context, fn func(string), args ...string) ([]byte, error) {
 	start := time.Now()
 
@@ -179,8 +184,7 @@ func (r runner) progress(ctx context.Context, fn func(string), args ...string) (
 	return stdout.Bytes(), nil
 }
 
-// scanProgress splits on carriage returns too, because that is how git redraws
-// a percentage in place rather than printing a new line.
+// scanProgress splits on carriage returns too: that is how git redraws.
 func scanProgress(data []byte, atEOF bool) (int, []byte, error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil

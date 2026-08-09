@@ -10,8 +10,7 @@ import (
 	"testing"
 )
 
-// netRepos builds a bare origin with one commit and two clones of it, so that
-// one clone can push behind the other's back.
+// netRepos builds a bare origin and two clones, so one can push behind the other.
 func netRepos(t *testing.T) (origin string, ours, theirs *Repo) {
 	t.Helper()
 	root := t.TempDir()
@@ -337,8 +336,7 @@ func hasRemoteRef(t *testing.T, repo *Repo, name string) bool {
 func TestFetchWithoutRemote(t *testing.T) {
 	repo := branchRepo(t)
 
-	// --all over no remotes at all is a no-op, not a failure; asking for one by
-	// name is the case where the user is owed an answer.
+	// --all over no remotes is a no-op; asking for one by name is not.
 	err := repo.Fetch(context.Background(), FetchOptions{Remote: "origin"}, nil)
 	if !errors.Is(err, ErrNoRemote) {
 		t.Errorf("Fetch: got %v, want ErrNoRemote", err)

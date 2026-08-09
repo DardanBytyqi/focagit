@@ -18,6 +18,8 @@ var (
 	ErrStaleInfo = errors.New("remote has changed since the last fetch")
 	// ErrAuth means git could not prove who we are.
 	ErrAuth = errors.New("authentication failed")
+	// ErrUnknownHost means the server is not in known_hosts, so ssh refuses.
+	ErrUnknownHost = errors.New("the server is not in known_hosts")
 	// ErrRemoteExists means a remote by that name is already configured.
 	ErrRemoteExists = errors.New("remote already exists")
 	// ErrInvalidRemoteName means git will not accept the name.
@@ -70,8 +72,7 @@ func (r *Repo) Remotes(ctx context.Context) ([]Remote, error) {
 	return list, nil
 }
 
-// AddRemote records a place to fetch from and push to. Note that git does not
-// check the URL here at all: only a fetch can tell you whether it was a typo.
+// AddRemote records a place to fetch from; git never checks the URL here.
 func (r *Repo) AddRemote(ctx context.Context, name, url string) error {
 	name = strings.TrimSpace(name)
 	url = strings.TrimSpace(url)
@@ -164,8 +165,7 @@ func (r *Repo) Push(ctx context.Context, opts PushOptions, onProgress func(strin
 		args = append(args, "--set-upstream")
 	}
 	if opts.Force {
-		// A lease, never a bare --force: it refuses if the remote moved since our
-		// last fetch, which is exactly the case where forcing destroys someone's work.
+		// A lease, never a bare --force: it refuses if the remote moved since our fetch.
 		args = append(args, "--force-with-lease")
 	}
 	if opts.Tags {
@@ -179,8 +179,7 @@ func (r *Repo) Push(ctx context.Context, opts PushOptions, onProgress func(strin
 	}
 
 	out, err := r.run.progress(ctx, onProgress, args...)
-	// The porcelain lines are printed even when the push is refused, and they say
-	// which ref was refused and why, so they are worth reading before the error.
+	// The porcelain lines say which ref was refused and why, even on failure.
 	results := parsePush(string(out))
 	if err != nil {
 		return results, classifyPush(err, results)
@@ -188,8 +187,7 @@ func (r *Repo) Push(ctx context.Context, opts PushOptions, onProgress func(strin
 	return results, nil
 }
 
-// classifyPush trusts the per-ref summary over stderr, because that is where git
-// puts the actual reason; stderr only says that something failed.
+// classifyPush trusts the per-ref summary: stderr only says something failed.
 func classifyPush(err error, results []PushResult) error {
 	for _, res := range results {
 		if res.Rejected && strings.Contains(res.Summary, "stale info") {
@@ -238,6 +236,8 @@ func classifyRemote(err error) error {
 		return ErrNoUpstream
 	case strings.Contains(msg, "failed to push some refs"):
 		return fmt.Errorf("%w: the remote has commits you do not have yet", ErrRejected)
+	case strings.Contains(msg, "Host key verification failed"):
+		return ErrUnknownHost
 	case strings.Contains(msg, "Authentication failed"),
 		strings.Contains(msg, "could not read Username"),
 		strings.Contains(msg, "Permission denied"),
