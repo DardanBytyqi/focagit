@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import Modal from '@/components/Modal.vue'
-import RemoteForm from '@/components/RemoteForm.vue'
+import Modal from '@/components/common/Modal.vue'
+import RemoteForm from '@/components/remote/RemoteForm.vue'
 import { useRepo } from '@/composables/useRepo'
 
 const props = defineProps<{ open: boolean }>()

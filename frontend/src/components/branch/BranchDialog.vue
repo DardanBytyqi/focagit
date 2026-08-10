@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import Check from '@/components/Check.vue'
-import Modal from '@/components/Modal.vue'
+import Check from '@/components/common/Check.vue'
+import Modal from '@/components/common/Modal.vue'
 import { useRepo } from '@/composables/useRepo'
 import type { BranchRequest } from '@/types'
 

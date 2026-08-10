@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import Check from '@/components/Check.vue'
-import Modal from '@/components/Modal.vue'
-import Select from '@/components/Select.vue'
-import RemoteForm from '@/components/RemoteForm.vue'
-import TrustHost from '@/components/TrustHost.vue'
+import Check from '@/components/common/Check.vue'
+import Modal from '@/components/common/Modal.vue'
+import Select from '@/components/common/Select.vue'
+import RemoteForm from '@/components/remote/RemoteForm.vue'
+import TrustHost from '@/components/remote/TrustHost.vue'
 import { useRepo } from '@/composables/useRepo'
 import { isAuthFailure, isRejected, isStaleInfo, isUnknownHost, remoteHost } from '@/utils/errors'
 

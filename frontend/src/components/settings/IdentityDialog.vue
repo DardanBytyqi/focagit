@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import type { prefs } from '@wails/go/models'
-import Modal from '@/components/Modal.vue'
+import Modal from '@/components/common/Modal.vue'
 import { usePrefs } from '@/composables/usePrefs'
 
 const props = defineProps<{ open: boolean; repoId: string | null; repoName: string }>()

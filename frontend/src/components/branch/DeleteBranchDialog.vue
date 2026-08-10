@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import Modal from '@/components/Modal.vue'
+import Modal from '@/components/common/Modal.vue'
 import { useRepo } from '@/composables/useRepo'
 import { isNotMerged } from '@/utils/errors'
 import type { DeleteRequest } from '@/types'

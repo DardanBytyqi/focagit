@@ -3,7 +3,7 @@ import { ref, watch } from 'vue'
 import type { git } from '@wails/go/models'
 import { CommitFiles, Diff } from '@wails/go/main/App'
 import { formatDate } from '@/utils/format'
-import DiffView from '@/components/DiffView.vue'
+import DiffView from '@/components/common/DiffView.vue'
 
 const props = defineProps<{
   repoId: string

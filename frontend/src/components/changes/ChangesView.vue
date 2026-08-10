@@ -13,9 +13,9 @@ import {
 import type { Selected, TreeNode } from '@/types'
 import { lineRefs } from '@/utils/lines'
 import { allDirs, buildTree } from '@/utils/tree'
-import Check from '@/components/Check.vue'
-import DiffView from '@/components/DiffView.vue'
-import FileTree from '@/components/FileTree.vue'
+import Check from '@/components/common/Check.vue'
+import DiffView from '@/components/common/DiffView.vue'
+import FileTree from '@/components/changes/FileTree.vue'
 
 const props = defineProps<{
   repoId: string

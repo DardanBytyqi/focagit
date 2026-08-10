@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import AppearanceSettings from '@/components/AppearanceSettings.vue'
-import Modal from '@/components/Modal.vue'
-import SSHSettings from '@/components/SSHSettings.vue'
+import AppearanceSettings from '@/components/settings/AppearanceSettings.vue'
+import Modal from '@/components/common/Modal.vue'
+import SSHSettings from '@/components/settings/SSHSettings.vue'
 
 const props = defineProps<{ open: boolean; section: string }>()
 const emit = defineEmits<{ close: [] }>()

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
-import Check from '@/components/Check.vue'
-import TrustHost from '@/components/TrustHost.vue'
+import Check from '@/components/common/Check.vue'
+import TrustHost from '@/components/remote/TrustHost.vue'
 import { useRepo } from '@/composables/useRepo'
 import { isUnknownHost, remoteHost } from '@/utils/errors'
 
