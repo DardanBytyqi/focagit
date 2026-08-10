@@ -1,5 +1,4 @@
-/* Design tokens. Everything visual references these, so the light theme in
-   stage 7 is a matter of redefining the block rather than hunting colours. */
+/* Design tokens. A theme redefines this block, never hunts colours. */
 :root {
   --bg: #1e1f22;
   --bg-raised: #26282c;
@@ -19,8 +18,7 @@
   --amber: #d9a441;
   --purple: #b07cd6;
 
-  /* Graph lane colours. There are eight because internal/graph uses a palette
-     of eight; the two only have to agree on the count, not on the values. */
+  /* Graph lanes: eight, because internal/graph uses eight. */
   --lane-0: #4a8cf7;
   --lane-1: #6cc26c;
   --lane-2: #d9a441;
@@ -30,8 +28,7 @@
   --lane-6: #d67ca8;
   --lane-7: #9aa0a6;
 
-  /* The two sides of a conflict. Not green and red: in a code view those already
-     mean added and removed, and a conflict is a choice, not a change. */
+  /* The two sides of a conflict. Not green and red: those mean added and removed. */
   --mine: #46b8b0;
   --theirs: #b07cd6;
 
@@ -208,8 +205,7 @@ button:disabled {
   color: var(--text-muted);
 }
 
-/* The label under the pointer while a branch is being dragged. It lives on the
-   body, so it cannot be scoped to the sidebar that creates it. */
+/* The label under the pointer while dragging. Lives on the body, so unscoped. */
 .drag-chip {
   position: fixed;
   top: -1000px;
@@ -222,4 +218,22 @@ button:disabled {
   font: var(--fs) var(--font);
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* A count pill. Floored width, so one digit and two are the same object. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  /* Digits of one width: the pill stops twitching as the count changes. */
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }

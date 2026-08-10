@@ -2,6 +2,7 @@ package git
 
 import (
 	"bufio"
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -227,4 +228,32 @@ func TestLogOptionsArgs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnpushedCount(t *testing.T) {
+	ctx := context.Background()
+	_, ours, _ := netRepos(t)
+
+	// A fresh clone has published everything it has.
+	if n := ours.UnpushedCount(ctx); n != 0 {
+		t.Errorf("UnpushedCount = %d, want 0 on a fresh clone", n)
+	}
+
+	gitIn(t, ours.Root(), "commit", "--allow-empty", "-qm", "solo qui")
+	if n := ours.UnpushedCount(ctx); n != 1 {
+		t.Errorf("UnpushedCount = %d, want 1", n)
+	}
+
+	gitIn(t, ours.Root(), "push", "-q", "origin", "HEAD")
+	if n := ours.UnpushedCount(ctx); n != 0 {
+		t.Errorf("UnpushedCount = %d after pushing, want 0", n)
+	}
+
+	// Without a remote, counting every commit would be noise rather than news.
+	t.Run("a repository with no remote counts nothing", func(t *testing.T) {
+		repo, _, _ := mergeRepo(t)
+		if n := repo.UnpushedCount(ctx); n != 0 {
+			t.Errorf("UnpushedCount = %d, want 0", n)
+		}
+	})
 }

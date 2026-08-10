@@ -144,3 +144,20 @@ func scanCommits(rd *bufio.Scanner, fn func(Commit) error) error {
 	}
 	return rd.Err()
 }
+
+// UnpushedCount is how many commits on HEAD are on no remote.
+func (r *Repo) UnpushedCount(ctx context.Context) int {
+	// With no remote configured every commit qualifies, which says nothing.
+	refs, err := r.run.outputQuiet(ctx, "for-each-ref", "--format=%(refname)", "refs/remotes")
+	if err != nil || len(bytes.TrimSpace(refs)) == 0 {
+		return 0
+	}
+
+	// The order matters: --not inverts everything after it, HEAD included.
+	out, err := r.run.outputQuiet(ctx, "rev-list", "--count", "HEAD", "--not", "--remotes")
+	if err != nil {
+		return 0
+	}
+	n, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+	return n
+}

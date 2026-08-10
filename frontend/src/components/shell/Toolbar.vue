@@ -38,8 +38,8 @@ const who = computed(() => {
   return sig.email
 })
 
-// How many commits are waiting to go out, and to come in.
-const ahead = computed(() => props.status?.ahead ?? 0)
+/** Commits waiting to go out; with no upstream, those on no remote. */
+const ahead = computed(() => props.status?.ahead || props.status?.unpushed || 0)
 const behind = computed(() => props.status?.behind ?? 0)
 
 // An upstream is nearly always "origin/" plus the branch you are already reading
@@ -80,7 +80,7 @@ const branchTitle = computed(() => {
       @click="emit('pull')"
     >
       Pull
-      <span v-if="behind" class="badge behind-badge">{{ behind }}</span>
+      <span v-if="behind" class="pill behind">{{ behind }}</span>
     </button>
 
     <!-- Push does the obvious thing; the arrow is for when it is not obvious. -->
@@ -92,7 +92,7 @@ const branchTitle = computed(() => {
         @click="emit('push')"
       >
         Push
-        <span v-if="ahead" class="badge">{{ ahead }}</span>
+        <span v-if="ahead" class="pill">{{ ahead }}</span>
       </button>
       <button
         class="split-more"
@@ -240,18 +240,12 @@ const branchTitle = computed(() => {
   flex: 1;
 }
 
-/* How many commits are waiting, on the button that would move them. */
-.badge {
-  margin-left: 5px;
-  padding: 0 5px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 11px;
+.pill {
+  margin-left: 6px;
 }
 
 /* Amber like everywhere else, and legible on a disabled button. */
-.badge.behind-badge {
+.pill.behind {
   background: var(--amber);
   color: #1e1f22;
 }

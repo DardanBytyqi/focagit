@@ -51,8 +51,7 @@ function onDragStart(e: DragEvent, r: git.Ref) {
   e.dataTransfer.setDragImage(dragChip(r.short), 14, 14)
 }
 
-// The browser drags a translucent photograph of the row otherwise, cut off at
-// the sidebar width. A chip carries the one thing being moved: the name.
+// Otherwise the browser drags a photograph of the row, cut off at the edge.
 function dragChip(label: string) {
   const chip = document.createElement('div')
   chip.className = 'drag-chip'
@@ -110,8 +109,7 @@ function toggle(key: string) {
 
 <template>
   <aside class="sidebar">
-    <!-- The working tree and the history are two views of the repository, not
-         a row inside one of them. Fork treats them as peers here. -->
+    <!-- Working tree and history are two views, not a row inside one. -->
     <nav class="nav">
       <div
         class="nav-item"
@@ -120,7 +118,7 @@ function toggle(key: string) {
       >
         <span class="nav-icon">◧</span>
         <span>Changes</span>
-        <span v-if="changeCount" class="badge">{{ changeCount }}</span>
+        <span v-if="changeCount" class="pill">{{ changeCount }}</span>
       </div>
       <div class="nav-item" :class="{ active: mode === 'commit' }" @click="emit('mode', 'commit')">
         <span class="nav-icon">≡</span>
@@ -240,14 +238,11 @@ function toggle(key: string) {
   color: var(--text-muted);
 }
 
-.badge {
+/* Pushed to the right edge, and amber: uncommitted work is waiting, not new. */
+.pill {
   margin-left: auto;
-  padding: 0 6px;
-  border-radius: 8px;
   background: var(--amber);
   color: #1e1f22;
-  font-size: 11px;
-  font-weight: 700;
 }
 
 .sidebar {
@@ -329,8 +324,7 @@ function toggle(key: string) {
   opacity: 0.45;
 }
 
-/* Where the drop would land. An outline rather than a fill, so the name below
-   it stays readable while the pointer is on top. */
+/* Where the drop would land: an outline, so the name stays readable. */
 .ref.target {
   background: var(--bg-selected);
   outline: 1px solid var(--accent);
@@ -342,9 +336,7 @@ function toggle(key: string) {
   color: var(--green);
 }
 
-/* The branch name always wins the available space. A long upstream name would
-   otherwise push it out of the row entirely, which is worse than truncating
-   the upstream: the name is the thing being identified. */
+/* The name wins the space: a long upstream would push it out of the row. */
 .ref-name {
   flex: 1 1 auto;
   min-width: 0;

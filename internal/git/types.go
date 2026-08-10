@@ -86,8 +86,10 @@ type Status struct {
 	Oid      string `json:"oid"`      // commit HEAD points at
 	Upstream string `json:"upstream"` // tracking branch, if any
 	Ahead    int    `json:"ahead"`
-	Behind   int    `json:"behind"`
-	Detached bool   `json:"detached"`
+	// Unpushed counts commits on no remote, for a branch with no upstream.
+	Unpushed int  `json:"unpushed"`
+	Behind   int  `json:"behind"`
+	Detached bool `json:"detached"`
 	// Merging is true between a conflicted merge and the commit that ends it.
 	Merging bool `json:"merging"`
 	// MergeFrom names the branch being merged in, empty when nothing is merging.

@@ -21,7 +21,11 @@ func (r *Repo) Status(ctx context.Context) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
-	// Read off disk rather than asking git: status is refreshed constantly.
+	// Only without an upstream: otherwise ahead already says it, for free.
+	if st.Upstream == "" && !st.Detached {
+		st.Unpushed = r.UnpushedCount(ctx)
+	}
+	// Off disk rather than asking git: status is refreshed constantly.
 	if _, err := os.Stat(filepath.Join(r.gitDir, "MERGE_HEAD")); err == nil {
 		st.Merging = true
 		st.MergeFrom = r.MergeSource(ctx)
