@@ -30,6 +30,11 @@
   --lane-6: #d67ca8;
   --lane-7: #9aa0a6;
 
+  /* The two sides of a conflict. Not green and red: in a code view those already
+     mean added and removed, and a conflict is a choice, not a change. */
+  --mine: #46b8b0;
+  --theirs: #b07cd6;
+
   --row-height: 24px;
   --sidebar-width: 240px;
   --toolbar-height: 40px;
@@ -76,6 +81,9 @@
   --lane-5: #0f7f78;
   --lane-6: #b1417c;
   --lane-7: #5d666f;
+
+  --mine: #0f7f78;
+  --theirs: #7743c9;
 }
 
 /* Density and font size are set on the root by the appearance settings. */
@@ -198,4 +206,20 @@ button:disabled {
 
 .muted {
   color: var(--text-muted);
+}
+
+/* The label under the pointer while a branch is being dragged. It lives on the
+   body, so it cannot be scoped to the sidebar that creates it. */
+.drag-chip {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+  padding: 3px 9px;
+  background: var(--bg-selected);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text);
+  font: var(--fs) var(--font);
+  white-space: nowrap;
+  pointer-events: none;
 }

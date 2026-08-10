@@ -539,6 +539,131 @@ func (a *App) SaveAppearance(look prefs.Appearance) (prefs.Appearance, error) {
 	return a.prefs.Appearance(), nil
 }
 
+// --- merge --------------------------------------------------------------------
+
+// PreviewMerge answers what a merge would do, so the UI offers only real choices.
+func (a *App) PreviewMerge(id, source, target string) (git.MergePreview, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.MergePreview{}, err
+	}
+	return repo.PreviewMerge(a.ctx, source, target)
+}
+
+// Merge joins a branch into the current one and reloads what changed.
+func (a *App) Merge(id string, opts git.MergeOptions) (git.MergeResult, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.MergeResult{}, err
+	}
+	res, err := repo.Merge(a.ctx, opts)
+	if err != nil {
+		return git.MergeResult{}, err
+	}
+	// A conflict changes the working tree too, so the views reload either way.
+	a.reload(repo)
+	return res, nil
+}
+
+// Pull fetches and then merges the upstream, reporting progress like a fetch does.
+func (a *App) Pull(id string, opts git.PullOptions) (git.MergeResult, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.MergeResult{}, err
+	}
+
+	res, err := repo.Pull(a.ctx, opts, a.report(id, "pull"))
+	runtime.EventsEmit(a.ctx, "repo:network", Network{ID: id, Op: "pull", Done: true, Error: errText(err)})
+	if err != nil {
+		return git.MergeResult{}, err
+	}
+	a.reload(repo)
+	return res, nil
+}
+
+// AbortMerge throws the merge away and puts the working tree back.
+func (a *App) AbortMerge(id string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.AbortMerge(a.ctx); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// FinishMerge records the merge commit once nothing is conflicted.
+func (a *App) FinishMerge(id, message string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.FinishMerge(a.ctx, message); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// Conflicts lists the unmerged files and which side still has each one.
+func (a *App) Conflicts(id string) ([]git.Conflict, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	list, err := repo.Conflicts(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		list = []git.Conflict{}
+	}
+	return list, nil
+}
+
+// ConflictText reads a conflicted file cut into the blocks that disagree.
+func (a *App) ConflictText(id, path string) (git.ConflictText, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.ConflictText{}, err
+	}
+	return repo.ConflictText(a.ctx, path)
+}
+
+// ResolveLines writes one choice per block and stages the result. The picks are
+// plain strings because Wails cannot carry a named string type across the bridge.
+func (a *App) ResolveLines(id, path string, picks []string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	choices := make([]git.ConflictPick, len(picks))
+	for i, p := range picks {
+		choices[i] = git.ConflictPick(p)
+	}
+	if err := repo.ResolveLines(a.ctx, path, choices); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// ResolveConflict settles one file by keeping one side whole. The side is a
+// plain string because Wails cannot carry a named string type across the bridge.
+func (a *App) ResolveConflict(id, path, side string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.Resolve(a.ctx, path, git.ConflictSide(side)); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
 // --- ssh keys -----------------------------------------------------------------
 
 // SSHKeys lists the keys in ~/.ssh and says which the agent already holds.

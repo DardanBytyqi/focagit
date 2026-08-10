@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -15,7 +17,16 @@ func (r *Repo) Status(ctx context.Context) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
-	return parseStatus(out)
+	st, err := parseStatus(out)
+	if err != nil {
+		return Status{}, err
+	}
+	// Read off disk rather than asking git: status is refreshed constantly.
+	if _, err := os.Stat(filepath.Join(r.gitDir, "MERGE_HEAD")); err == nil {
+		st.Merging = true
+		st.MergeFrom = r.MergeSource(ctx)
+	}
+	return st, nil
 }
 
 func parseStatus(data []byte) (Status, error) {

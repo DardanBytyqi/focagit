@@ -1,22 +1,32 @@
-import { reactive } from 'vue'
+import { computed, reactive } from 'vue'
 import type { git, session } from '@wails/go/models'
 import {
+  AbortMerge,
   AddRemote,
   Checkout,
   CheckoutCommit,
+  ConflictText,
+  Conflicts,
   CreateBranch,
   DeleteBranch,
   Fetch,
+  FinishMerge,
   GetHistory,
   GetRemotes,
   InitRepo,
   Inspect,
+  Merge,
+  PreviewMerge,
   OpenRepo,
+  Pull,
   Push,
   Refs,
   RemoveRemote,
   RenameBranch,
+  ResolveConflict,
+  ResolveLines,
   SelectRepo,
+  StageFiles,
   Status,
 } from '@wails/go/main/App'
 import { EventsOn } from '@wails/runtime/runtime'
@@ -39,6 +49,10 @@ interface State {
   remotes: git.Remote[]
   /** git's own progress line while a fetch or push runs; empty when idle. */
   network: string
+  /** The unmerged files, refreshed with everything else while a merge is open. */
+  conflicts: git.Conflict[]
+  /** True while a network or merge operation runs, so it cannot be started twice. */
+  busy: boolean
 }
 
 const state = reactive<State>({
@@ -53,6 +67,8 @@ const state = reactive<State>({
   initCandidate: '',
   remotes: [],
   network: '',
+  conflicts: [],
+  busy: false,
 })
 
 interface Progress {
@@ -155,6 +171,8 @@ async function refresh() {
     state.gen = history.gen
     state.count = history.count
     state.width = Math.max(1, history.width)
+    // Only a merge in progress can have conflicts, so nothing else is asked.
+    state.conflicts = status.merging ? await Conflicts(state.info.id) : []
   } catch (e) {
     state.error = String(e)
   }
@@ -177,6 +195,27 @@ async function act(fn: (id: string) => Promise<void>): Promise<boolean> {
   }
 }
 
+/** Marks the repository busy for as long as a long operation runs. */
+async function working<T>(fn: () => Promise<T>): Promise<T> {
+  state.busy = true
+  try {
+    return await fn()
+  } finally {
+    state.busy = false
+  }
+}
+
+/** Refs indexed by the commit they point at, for the graph to label rows. */
+const refsByHash = computed(() => {
+  const m = new Map<string, git.Ref[]>()
+  for (const r of state.refs) {
+    const list = m.get(r.hash)
+    if (list) list.push(r)
+    else m.set(r.hash, [r])
+  }
+  return m
+})
+
 /** Reads the remotes; the push dialog needs them before it can offer a choice. */
 async function loadRemotes() {
   if (!state.info) return
@@ -187,7 +226,7 @@ async function loadRemotes() {
   }
 }
 
-const fetchAll = (opts: git.FetchOptions) => act((id) => Fetch(id, opts))
+const fetchAll = (opts: git.FetchOptions) => working(() => act((id) => Fetch(id, opts)))
 
 /** Adds a remote, then re-reads the list the push dialog offers. */
 async function addRemote(name: string, url: string, fetchNow: boolean): Promise<boolean> {
@@ -205,8 +244,61 @@ const removeRemote = (name: string) => act((id) => RemoveRemote(id, name))
 async function push(opts: git.PushOptions): Promise<git.PushResult[] | null> {
   if (!state.info) return null
   state.error = ''
+  return working(async () => {
+    try {
+      const res = await Push(state.info!.id, opts)
+      await refresh()
+      return res
+    } catch (e) {
+      state.error = errorText(e)
+      return null
+    }
+  })
+}
+
+/** Merges and returns what it turned out to be, or null when git refused. */
+async function merge(opts: git.MergeOptions): Promise<git.MergeResult | null> {
+  return working(() => run((id) => Merge(id, opts)))
+}
+
+/** One conflicted file cut into the blocks that disagree. */
+async function conflictText(path: string): Promise<git.ConflictText | null> {
+  if (!state.info) return null
   try {
-    const res = await Push(state.info.id, opts)
+    return await ConflictText(state.info.id, path)
+  } catch (e) {
+    state.error = errorText(e)
+    return null
+  }
+}
+
+const resolveLines = (path: string, picks: string[]) => act((id) => ResolveLines(id, path, picks))
+
+/** Accepts the file as it stands, for a conflict already settled by hand. */
+const markResolved = (path: string) => act((id) => StageFiles(id, [path]))
+
+/** What a merge would do, for a menu that should only offer real choices. */
+async function previewMerge(source: string, target: string): Promise<git.MergePreview | null> {
+  if (!state.info) return null
+  try {
+    return await PreviewMerge(state.info.id, source, target)
+  } catch (e) {
+    state.error = errorText(e)
+    return null
+  }
+}
+
+/** Pull is a fetch and a merge, so it can refuse for either one's reasons. */
+async function pull(opts: git.PullOptions): Promise<git.MergeResult | null> {
+  return working(() => run((id) => Pull(id, opts)))
+}
+
+/** act for calls that return something worth keeping. */
+async function run<T>(fn: (id: string) => Promise<T>): Promise<T | null> {
+  if (!state.info) return null
+  state.error = ''
+  try {
+    const res = await fn(state.info.id)
     await refresh()
     return res
   } catch (e) {
@@ -214,6 +306,11 @@ async function push(opts: git.PushOptions): Promise<git.PushResult[] | null> {
     return null
   }
 }
+
+const abortMerge = () => act((id) => AbortMerge(id))
+const finishMerge = (message: string) => act((id) => FinishMerge(id, message))
+const resolveConflict = (path: string, side: 'ours' | 'theirs') =>
+  act((id) => ResolveConflict(id, path, side))
 
 const checkout = (ref: git.Ref) => act((id) => Checkout(id, ref))
 const checkoutCommit = (hash: string) => act((id) => CheckoutCommit(id, hash))
@@ -224,6 +321,7 @@ const renameBranch = (from: string, to: string) => act((id) => RenameBranch(id, 
 export function useRepo() {
   return {
     state,
+    refsByHash,
     open,
     browse,
     refresh,
@@ -238,5 +336,14 @@ export function useRepo() {
     removeRemote,
     fetchAll,
     push,
+    merge,
+    previewMerge,
+    pull,
+    abortMerge,
+    finishMerge,
+    resolveConflict,
+    conflictText,
+    resolveLines,
+    markResolved,
   }
 }

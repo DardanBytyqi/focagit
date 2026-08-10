@@ -32,7 +32,7 @@ watch(
 </script>
 
 <template>
-  <Modal v-model:open="isOpen" title="Settings" wide>
+  <Modal v-model:open="isOpen" title="Settings" :width="560">
     <div class="settings">
       <nav>
         <button

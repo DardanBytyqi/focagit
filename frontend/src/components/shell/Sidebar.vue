@@ -14,16 +14,80 @@ const props = defineProps<{
   refs: git.Ref[]
   changeCount: number
   mode: 'commit' | 'changes'
+  /** The branch a merge would land on; empty when HEAD is detached. */
+  head: string
 }>()
 
 const emit = defineEmits<{
   mode: [m: 'commit' | 'changes']
   checkout: [r: git.Ref]
+  merge: [r: git.Ref]
+  mergeDrop: [source: git.Ref, target: git.Ref, x: number, y: number]
   create: [start: string, label: string]
   rename: [name: string]
   remove: [name: string]
   addRemote: []
 }>()
+
+/** The ref under the pointer during a drag, and the row it is over. */
+const dragged = ref<git.Ref | null>(null)
+const over = ref('')
+
+// Only a local branch can receive a merge: it is the one that moves.
+function canDrop(target: git.Ref) {
+  const src = dragged.value
+  return !!src && target.kind === 'branch' && target.name !== src.name
+}
+
+function onDragStart(e: DragEvent, r: git.Ref) {
+  if (!canCheckout(r)) {
+    e.preventDefault()
+    return
+  }
+  dragged.value = r
+  if (!e.dataTransfer) return
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', r.short)
+  e.dataTransfer.setDragImage(dragChip(r.short), 14, 14)
+}
+
+// The browser drags a translucent photograph of the row otherwise, cut off at
+// the sidebar width. A chip carries the one thing being moved: the name.
+function dragChip(label: string) {
+  const chip = document.createElement('div')
+  chip.className = 'drag-chip'
+  chip.textContent = label
+  document.body.appendChild(chip)
+  // It has to be in the document to be photographed, and gone right after.
+  setTimeout(() => chip.remove(), 0)
+  return chip
+}
+
+function onDragOver(e: DragEvent, r: git.Ref) {
+  if (!canDrop(r)) return
+  // Without preventDefault the browser refuses the drop and shows no cursor.
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+  over.value = r.name
+}
+
+function onDrop(e: DragEvent, r: git.Ref) {
+  if (!canDrop(r)) return
+  e.preventDefault()
+  // The menu opens where the pointer let go, not in the middle of the window.
+  emit('mergeDrop', dragged.value as git.Ref, r, e.clientX, e.clientY)
+  endDrag()
+}
+
+function endDrag() {
+  dragged.value = null
+  over.value = ''
+}
+
+// A merge needs a branch to merge and a branch to merge into.
+function canMerge(r: git.Ref) {
+  return !r.head && !!props.head && (r.kind === 'branch' || r.kind === 'remote')
+}
 
 // Only branches can be checked out directly; a tag would detach HEAD.
 function canCheckout(r: git.Ref) {
@@ -84,8 +148,15 @@ function toggle(key: string) {
           <ContextMenuTrigger as-child>
             <div
               class="ref"
-              :class="{ head: r.head }"
+              :class="{ head: r.head, target: over === r.name, dragging: dragged?.name === r.name }"
+              :draggable="canCheckout(r)"
+              :title="dragged && canDrop(r) ? `Merge ${dragged.short} into ${r.short}` : ''"
               @dblclick="canCheckout(r) && emit('checkout', r)"
+              @dragstart="onDragStart($event, r)"
+              @dragend="endDrag"
+              @dragover="onDragOver($event, r)"
+              @dragleave="over === r.name && (over = '')"
+              @drop="onDrop($event, r)"
             >
               <span class="ref-name">{{ r.short }}</span>
               <span v-if="r.upstream" class="upstream muted mono">{{ r.upstream }}</span>
@@ -101,6 +172,15 @@ function toggle(key: string) {
                 @select="emit('checkout', r)"
               >
                 Checkout {{ r.short }}
+              </ContextMenuItem>
+
+              <!-- Merging a branch into itself is the one thing it cannot do. -->
+              <ContextMenuItem
+                v-if="canMerge(r)"
+                class="menu-item"
+                @select="emit('merge', r)"
+              >
+                Merge {{ r.short }} into {{ head }}
               </ContextMenuItem>
 
               <ContextMenuItem class="menu-item" @select="emit('create', r.short, r.short)">
@@ -237,6 +317,24 @@ function toggle(key: string) {
 
 .ref:hover {
   background: var(--bg-hover);
+}
+
+/* Only the rows that can actually be dragged say so under the pointer. */
+.ref[draggable='true']:active {
+  cursor: grabbing;
+}
+
+/* The row being carried stays visible but clearly no longer in place. */
+.ref.dragging {
+  opacity: 0.45;
+}
+
+/* Where the drop would land. An outline rather than a fill, so the name below
+   it stays readable while the pointer is on top. */
+.ref.target {
+  background: var(--bg-selected);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 
 .ref.head .ref-name {

@@ -277,3 +277,37 @@ func (r *Repo) Fetch(ctx context.Context, opts git.FetchOptions, onProgress func
 func (r *Repo) Push(ctx context.Context, opts git.PushOptions, onProgress func(string)) ([]git.PushResult, error) {
 	return r.git.Push(ctx, opts, onProgress)
 }
+
+func (r *Repo) PreviewMerge(ctx context.Context, source, target string) (git.MergePreview, error) {
+	return r.git.PreviewMerge(ctx, source, target)
+}
+
+func (r *Repo) Merge(ctx context.Context, opts git.MergeOptions) (git.MergeResult, error) {
+	return r.git.Merge(ctx, opts)
+}
+
+func (r *Repo) Pull(ctx context.Context, opts git.PullOptions, onProgress func(string)) (git.MergeResult, error) {
+	return r.git.Pull(ctx, opts, onProgress)
+}
+
+func (r *Repo) AbortMerge(ctx context.Context) error { return r.git.AbortMerge(ctx) }
+
+func (r *Repo) FinishMerge(ctx context.Context, message string) error {
+	return r.git.FinishMerge(ctx, message)
+}
+
+func (r *Repo) Conflicts(ctx context.Context) ([]git.Conflict, error) {
+	return r.git.Conflicts(ctx)
+}
+
+func (r *Repo) ConflictText(ctx context.Context, path string) (git.ConflictText, error) {
+	return r.git.ConflictText(ctx, path)
+}
+
+func (r *Repo) ResolveLines(ctx context.Context, path string, picks []git.ConflictPick) error {
+	return r.git.ResolveLines(ctx, path, picks)
+}
+
+func (r *Repo) Resolve(ctx context.Context, path string, side git.ConflictSide) error {
+	return r.git.Resolve(ctx, path, side)
+}

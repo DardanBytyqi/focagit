@@ -23,6 +23,7 @@ const emit = defineEmits<{
   branch: []
   identity: []
   fetch: []
+  pull: []
   push: []
   pushOptions: []
   settings: [section: string]
@@ -73,7 +74,11 @@ const branchTitle = computed(() => {
       Fetch
     </button>
 
-    <button disabled title="Pull is next">
+    <button
+      :disabled="!info || busy"
+      title="Fetch and merge the upstream"
+      @click="emit('pull')"
+    >
       Pull
       <span v-if="behind" class="badge behind-badge">{{ behind }}</span>
     </button>

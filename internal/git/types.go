@@ -82,13 +82,17 @@ type FileStatus struct {
 
 // Status is the full working tree state plus the branch header.
 type Status struct {
-	Head     string       `json:"head"`     // branch name, empty when detached
-	Oid      string       `json:"oid"`      // commit HEAD points at
-	Upstream string       `json:"upstream"` // tracking branch, if any
-	Ahead    int          `json:"ahead"`
-	Behind   int          `json:"behind"`
-	Detached bool         `json:"detached"`
-	Files    []FileStatus `json:"files"`
+	Head     string `json:"head"`     // branch name, empty when detached
+	Oid      string `json:"oid"`      // commit HEAD points at
+	Upstream string `json:"upstream"` // tracking branch, if any
+	Ahead    int    `json:"ahead"`
+	Behind   int    `json:"behind"`
+	Detached bool   `json:"detached"`
+	// Merging is true between a conflicted merge and the commit that ends it.
+	Merging bool `json:"merging"`
+	// MergeFrom names the branch being merged in, empty when nothing is merging.
+	MergeFrom string       `json:"mergeFrom"`
+	Files     []FileStatus `json:"files"`
 }
 
 // IsClean reports whether there is nothing to commit and nothing untracked.

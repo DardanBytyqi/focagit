@@ -28,3 +28,11 @@ export type BranchRequest =
 export interface DeleteRequest {
   name: string
 }
+
+/** A branch dropped on another branch, and where the pointer let go. */
+export interface MergeDrop {
+  source: git.Ref
+  target: git.Ref
+  x: number
+  y: number
+}

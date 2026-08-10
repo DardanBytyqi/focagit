@@ -1,7 +1,19 @@
 <script setup lang="ts">
 import { DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
 
-defineProps<{ title: string; wide?: boolean }>()
+const props = withDefaults(
+  defineProps<{
+    title: string
+    /** Width in pixels. Narrower windows win: it never exceeds the viewport. */
+    width?: number
+    /**
+     * Take a set height and scroll inside, instead of growing with the content.
+     * A work surface needs its own scrollbar; a form is as tall as its fields.
+     */
+    fill?: boolean
+  }>(),
+  { width: 380 },
+)
 
 const open = defineModel<boolean>('open', { required: true })
 </script>
@@ -10,7 +22,11 @@ const open = defineModel<boolean>('open', { required: true })
   <DialogRoot v-model:open="open">
     <DialogPortal>
       <DialogOverlay class="overlay" />
-      <DialogContent class="dialog" :class="{ wide }">
+      <DialogContent
+        class="dialog"
+        :class="{ fill }"
+        :style="{ width: `min(${props.width}px, 95vw)` }"
+      >
         <DialogTitle class="title">{{ title }}</DialogTitle>
         <slot />
       </DialogContent>
@@ -34,7 +50,6 @@ const open = defineModel<boolean>('open', { required: true })
   inset: 0;
   margin: auto;
   z-index: calc(var(--z-modal) + 1);
-  width: 380px;
   height: fit-content;
   max-height: 76vh;
   overflow-y: auto;
@@ -45,8 +60,18 @@ const open = defineModel<boolean>('open', { required: true })
   box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
 }
 
-.dialog.wide {
-  width: 560px;
+/* A set height, so the panes inside get the same room whatever the content is. */
+.dialog.fill {
+  display: flex;
+  flex-direction: column;
+  height: min(900px, 92vh);
+  max-height: 92vh;
+  overflow: hidden;
+}
+
+/* Only the pane that owns the scrollbar should scroll, not the whole dialog. */
+.dialog.fill > .title {
+  flex: none;
 }
 
 .dialog .title {

@@ -111,7 +111,7 @@ async function saveDraft() {
 </script>
 
 <template>
-  <Modal v-model:open="isOpen" title="Who commits here" wide>
+  <Modal v-model:open="isOpen" title="Who commits here" :width="560">
     <p class="lead">
       Commits made in <b>{{ repoName }}</b> are signed with the identity you pick here.
     </p>
