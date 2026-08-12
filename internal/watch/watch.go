@@ -118,6 +118,9 @@ func (w *Watcher) run() {
 				return
 			}
 			w.cfg.Log.Warn("watcher", slog.String("err", err.Error()))
+			// Events were lost, and what they said is unknown: reread everything.
+			refs = true
+			quiet = time.After(w.cfg.Debounce)
 
 		case <-quiet:
 			quiet = nil
