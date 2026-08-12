@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import RecentList from '@/components/shell/RecentList.vue'
+import { useDialogs } from '@/composables/useDialogs'
 import { useRepo } from '@/composables/useRepo'
 
 const { state, open, browse, initHere } = useRepo()
+const dialogs = useDialogs()
 </script>
 
 <template>
@@ -22,7 +24,10 @@ const { state, open, browse, initHere } = useRepo()
 
     <template v-else>
       <p class="muted">Open a repository to get started.</p>
-      <button class="primary" @click="browse">Open repository…</button>
+      <div class="row">
+        <button class="primary" @click="browse">Open repository…</button>
+        <button @click="dialogs.open.clone = true">Clone repository…</button>
+      </div>
       <RecentList @open="open" />
     </template>
 

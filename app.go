@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -21,6 +23,10 @@ type App struct {
 	ctx     context.Context
 	session *session.Session
 	prefs   *prefs.Store
+
+	// mu guards cloneCancel, which the clone and its cancel button share.
+	mu          sync.Mutex
+	cloneCancel context.CancelFunc
 }
 
 func NewApp() *App {
@@ -123,6 +129,63 @@ func (a *App) SelectRepo() (string, error) {
 	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "Open repository",
 	})
+}
+
+// SelectFolder is the same picker, for choosing where a clone should land.
+func (a *App) SelectFolder(title, start string) (string, error) {
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:            title,
+		DefaultDirectory: start,
+	})
+}
+
+// CloneParent is where the last repository was opened from, or the home folder.
+func (a *App) CloneParent() string {
+	if a.prefs != nil {
+		if recents := a.prefs.Recents(); len(recents) > 0 {
+			return filepath.Dir(recents[0].Path)
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return home
+}
+
+// PreviewClone says where these options would put the repository.
+func (a *App) PreviewClone(opts git.CloneOptions) git.ClonePreview {
+	return git.PreviewClone(opts)
+}
+
+// CloneRepo copies a remote repository to disk and opens it.
+func (a *App) CloneRepo(opts git.CloneOptions) (session.Info, error) {
+	ctx, cancel := context.WithCancel(a.ctx)
+	a.mu.Lock()
+	a.cloneCancel = cancel
+	a.mu.Unlock()
+	defer func() {
+		a.mu.Lock()
+		a.cloneCancel = nil
+		a.mu.Unlock()
+		cancel()
+	}()
+
+	path, err := git.Clone(ctx, opts, a.report("", "clone"))
+	runtime.EventsEmit(a.ctx, "repo:network", Network{Op: "clone", Done: true, Error: errText(err)})
+	if err != nil {
+		return session.Info{}, err
+	}
+	return a.OpenRepo(path)
+}
+
+// CancelClone stops a clone in progress; the half-copied folder is removed.
+func (a *App) CancelClone() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.cloneCancel != nil {
+		a.cloneCancel()
+	}
 }
 
 // CloseRepo cancels any in-flight load and drops the cache.

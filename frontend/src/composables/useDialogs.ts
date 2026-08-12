@@ -7,6 +7,7 @@ import type { BranchRequest, DeleteRequest, MergeDrop } from '@/types'
  * anything is open at all.
  */
 const open = reactive({
+  clone: false,
   identity: false,
   push: false,
   remote: false,

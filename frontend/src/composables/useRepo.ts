@@ -3,8 +3,10 @@ import type { git, session } from '@wails/go/models'
 import {
   AbortMerge,
   AddRemote,
+  CancelClone,
   Checkout,
   CheckoutCommit,
+  CloneRepo,
   ConflictText,
   Conflicts,
   CreateBranch,
@@ -104,20 +106,27 @@ interface NetworkEvent {
 
 // Fetch and push report what they are doing while they do it.
 EventsOn('repo:network', (n: NetworkEvent) => {
-  if (!state.info || n.id !== state.info.id) return
+  // A clone has no repository yet, so it carries no id.
+  if (n.id && n.id !== state.info?.id) return
   state.network = n.done ? '' : n.line
 })
+
+/** Clears what belonged to the repository we are leaving. */
+function reset() {
+  state.count = 0
+  state.width = 1
+  state.refs = []
+  state.status = null
+  state.conflicts = []
+}
 
 async function open(path: string) {
   state.error = ''
   state.initCandidate = ''
   try {
     state.info = await OpenRepo(path)
-    state.count = 0
-    state.width = 1
+    reset()
     state.loading = true
-    state.refs = []
-    state.status = null
     // A repository already open returns immediately with its history cached and emits no.
     await refresh()
   } catch (e) {
@@ -142,10 +151,7 @@ async function initHere() {
   try {
     state.info = await InitRepo(path)
     state.initCandidate = ''
-    state.count = 0
-    state.width = 1
-    state.refs = []
-    state.status = null
+    reset()
     await refresh()
   } catch (e) {
     state.error = String(e)
@@ -156,6 +162,28 @@ async function browse() {
   const path = await SelectRepo()
   if (path) await open(path)
 }
+
+/** Clones and opens the result; git's refusal is left in state.error. */
+async function clone(opts: git.CloneOptions): Promise<boolean> {
+  state.error = ''
+  state.initCandidate = ''
+  return working(async () => {
+    try {
+      const info = await CloneRepo(opts)
+      state.info = info
+      reset()
+      state.loading = true
+      await refresh()
+      return true
+    } catch (e) {
+      state.error = errorText(e)
+      return false
+    }
+  })
+}
+
+/** Stops a clone in progress; nothing of it is left on disk. */
+const cancelClone = () => CancelClone()
 
 /** Re-reads refs and working tree status. */
 async function refresh() {
@@ -326,6 +354,8 @@ export function useRepo() {
     browse,
     refresh,
     initHere,
+    clone,
+    cancelClone,
     checkout,
     checkoutCommit,
     createBranch,

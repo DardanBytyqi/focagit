@@ -19,6 +19,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   browse: []
+  clone: []
   refresh: []
   branch: []
   identity: []
@@ -62,6 +63,7 @@ const branchTitle = computed(() => {
 <template>
   <div class="toolbar">
     <button @click="emit('browse')">Open…</button>
+    <button :disabled="busy" @click="emit('clone')">Clone…</button>
     <button :disabled="!info" @click="emit('refresh')">Refresh</button>
 
     <span class="sep"></span>

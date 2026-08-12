@@ -9,6 +9,7 @@ import HistoryPane from '@/components/history/HistoryPane.vue'
 import ConflictView from '@/components/merge/ConflictView.vue'
 import MergeBar from '@/components/merge/MergeBar.vue'
 import MergeDropMenu from '@/components/merge/MergeDropMenu.vue'
+import CloneDialog from '@/components/remote/CloneDialog.vue'
 import PushDialog from '@/components/remote/PushDialog.vue'
 import RemoteDialog from '@/components/remote/RemoteDialog.vue'
 import IdentityDialog from '@/components/settings/IdentityDialog.vue'
@@ -97,6 +98,7 @@ onMounted(async () => {
       :signature="prefsState.signature"
       :busy="state.busy"
       @browse="browse"
+      @clone="dialog.clone = true"
       @refresh="refresh"
       @branch="branchFromHead"
       @identity="dialog.identity = true"
@@ -159,6 +161,7 @@ onMounted(async () => {
       :network="state.network"
     />
 
+    <CloneDialog :open="dialog.clone" @close="dialog.clone = false" />
     <BranchDialog :request="branchRequest" @close="branchRequest = null" />
     <DeleteBranchDialog :request="deleteRequest" @close="deleteRequest = null" />
     <IdentityDialog
