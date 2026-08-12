@@ -99,7 +99,6 @@ onMounted(async () => {
       :busy="state.busy"
       @browse="browse"
       @clone="dialog.clone = true"
-      @refresh="refresh"
       @branch="branchFromHead"
       @identity="dialog.identity = true"
       @fetch="doFetch"

@@ -67,6 +67,7 @@ func (a *App) OpenRepo(path string) (session.Info, error) {
 	}
 
 	a.reload(repo)
+	a.startWatch(repo)
 	if a.prefs != nil {
 		if err := a.prefs.Remember(repo.Info.Path, repo.Info.Name); err != nil {
 			slog.Warn("could not save the recent list", slog.String("err", err.Error()))
@@ -87,6 +88,29 @@ func (a *App) reload(repo *session.Repo) {
 			runtime.EventsEmit(a.ctx, "repo:progress", Progress{
 				ID: repo.Info.ID, Gen: repo.Gen(), Done: true, Error: err.Error(),
 			})
+		}
+	}()
+}
+
+// Changed says the repository moved under us, so the frontend re-reads what it shows.
+type Changed struct {
+	ID string `json:"id"`
+}
+
+// startWatch reports later changes on disk; listing the ignored folders can be slow.
+func (a *App) startWatch(repo *session.Repo) {
+	go func() {
+		err := repo.Watch(a.ctx, func(refs bool) {
+			// A moved branch changes the graph, which only a fresh walk can rebuild.
+			if refs {
+				a.reload(repo)
+				return
+			}
+			runtime.EventsEmit(a.ctx, "repo:changed", Changed{ID: repo.Info.ID})
+		})
+		if err != nil {
+			slog.Warn("changes made outside focagit will go unnoticed",
+				slog.String("repo", repo.Info.Name), slog.String("err", err.Error()))
 		}
 	}()
 }

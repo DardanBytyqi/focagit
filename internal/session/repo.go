@@ -9,6 +9,7 @@ import (
 	"github.com/dardanbytyqi/focagit/internal/git"
 	"github.com/dardanbytyqi/focagit/internal/graph"
 	"github.com/dardanbytyqi/focagit/internal/patch"
+	"github.com/dardanbytyqi/focagit/internal/watch"
 )
 
 // progressBatch is how many commits accumulate before the loader reports progress.
@@ -33,6 +34,53 @@ type Repo struct {
 	cancel  context.CancelFunc
 	// gen counts reloads, so the frontend knows its cached pages are stale.
 	gen int
+	// watcher is nil until someone asks to be told about changes.
+	watcher *watch.Watcher
+}
+
+// Watch calls onChange whenever the working tree or the refs move on disk.
+func (r *Repo) Watch(ctx context.Context, onChange func(refs bool)) error {
+	r.mu.Lock()
+	running := r.watcher != nil
+	r.mu.Unlock()
+	if running {
+		return nil
+	}
+
+	// Ignored folders are where the build output lives: thousands of handles, nothing to show.
+	ignored, err := r.git.IgnoredDirs(ctx)
+	if err != nil {
+		slog.Warn("could not list the ignored folders", slog.String("err", err.Error()))
+	}
+
+	w, err := watch.Start(watch.Config{
+		Root:   r.git.Root(),
+		GitDir: r.git.GitDir(),
+		Skip:   ignored,
+		// A folder born later is asked about once: node_modules must not be watched.
+		Ignored:  func(dir string) bool { return r.git.Ignores(ctx, dir) },
+		OnChange: onChange,
+	})
+	if err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	r.watcher = w
+	r.mu.Unlock()
+	return nil
+}
+
+// stopWatch releases the inotify handles the watcher holds.
+func (r *Repo) stopWatch() {
+	r.mu.Lock()
+	w := r.watcher
+	r.watcher = nil
+	r.mu.Unlock()
+
+	if w != nil {
+		_ = w.Close()
+	}
 }
 
 // Gen is the current history generation; it changes on every reload.

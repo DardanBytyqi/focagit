@@ -111,6 +111,12 @@ EventsOn('repo:network', (n: NetworkEvent) => {
   state.network = n.done ? '' : n.line
 })
 
+// Something moved on disk, made by us or by anything else on the machine.
+EventsOn('repo:changed', (c: { id: string }) => {
+  if (c.id !== state.info?.id) return
+  void refresh()
+})
+
 /** Clears what belonged to the repository we are leaving. */
 function reset() {
   state.count = 0
