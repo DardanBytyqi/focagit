@@ -20,6 +20,8 @@ var (
 	ErrAuth = errors.New("authentication failed")
 	// ErrUnknownHost means the server is not in known_hosts, so ssh refuses.
 	ErrUnknownHost = errors.New("the server is not in known_hosts")
+	// ErrUnreachable means the server never answered: bad address, or no network.
+	ErrUnreachable = errors.New("cannot reach the server")
 	// ErrRemoteExists means a remote by that name is already configured.
 	ErrRemoteExists = errors.New("remote already exists")
 	// ErrInvalidRemoteName means git will not accept the name.
@@ -220,6 +222,17 @@ func parsePush(out string) []PushResult {
 	return list
 }
 
+// fatalLine is git's own verdict, without the progress chatter that came before it.
+func fatalLine(stderr string) string {
+	lines := strings.Split(strings.TrimSpace(stderr), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if line := strings.TrimSpace(lines[i]); strings.HasPrefix(line, "fatal: ") {
+			return strings.TrimPrefix(line, "fatal: ")
+		}
+	}
+	return strings.TrimSpace(lines[len(lines)-1])
+}
+
 // classifyRemote turns git's prose refusals into sentinels the UI can react to.
 func classifyRemote(err error) error {
 	var ce *CommandError
@@ -238,6 +251,12 @@ func classifyRemote(err error) error {
 		return fmt.Errorf("%w: the remote has commits you do not have yet", ErrRejected)
 	case strings.Contains(msg, "Host key verification failed"):
 		return ErrUnknownHost
+	case strings.Contains(msg, "Could not resolve host"),
+		strings.Contains(msg, "Could not resolve proxy"),
+		strings.Contains(msg, "Connection refused"),
+		strings.Contains(msg, "Connection timed out"),
+		strings.Contains(msg, "Network is unreachable"):
+		return fmt.Errorf("%w: %s", ErrUnreachable, fatalLine(msg))
 	case strings.Contains(msg, "Authentication failed"),
 		strings.Contains(msg, "could not read Username"),
 		strings.Contains(msg, "Permission denied"),

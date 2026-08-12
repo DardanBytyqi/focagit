@@ -11,7 +11,8 @@ const UNKNOWN_HOST = 'the server is not in known_hosts'
 /** Strips the "git <args>: exit status N:" prefix git errors carry. */
 export function errorText(e: unknown): string {
   const s = String(e).replace(/^Error:\s*/, '')
-  return s.replace(/^git [^:]*: exit status \d+:\s*/, '')
+  // Lazy, because an argument can hold colons of its own: a URL does.
+  return s.replace(/^git .*?: exit status \d+:\s*/, '')
 }
 
 /** True when the branch still holds commits nowhere else, so -D is the way out. */
