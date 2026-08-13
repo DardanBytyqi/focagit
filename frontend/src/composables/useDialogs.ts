@@ -1,4 +1,5 @@
 import { computed, reactive, ref } from 'vue'
+import type { git } from '@wails/go/models'
 import type { BranchRequest, DeleteRequest, MergeDrop } from '@/types'
 
 /**
@@ -13,6 +14,7 @@ const open = reactive({
   remote: false,
   settings: false,
   conflicts: false,
+  stash: false,
 })
 
 /** Which pane the settings window lands on. */
@@ -22,6 +24,7 @@ const settingsSection = ref('appearance')
 const branchRequest = ref<BranchRequest | null>(null)
 const deleteRequest = ref<DeleteRequest | null>(null)
 const mergeDrop = ref<MergeDrop | null>(null)
+const dropStashRequest = ref<git.Stash | null>(null)
 
 /** An error shown inside a window does not need repeating in the status bar. */
 const anyOpen = computed(() => Object.values(open).some(Boolean))
@@ -52,6 +55,7 @@ export function useDialogs() {
     branchRequest,
     deleteRequest,
     mergeDrop,
+    dropStashRequest,
     anyOpen,
     showSettings,
     showSSH,

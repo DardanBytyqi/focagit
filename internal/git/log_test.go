@@ -210,14 +210,14 @@ func TestLogOptionsArgs(t *testing.T) {
 		want []string
 	}{
 		{"empty", LogOptions{}, []string{}},
-		{"all", LogOptions{All: true}, []string{"--all"}},
+		{"all", LogOptions{All: true}, []string{"--exclude=refs/stash", "--all"}},
 		{"limit and skip", LogOptions{Limit: 50, Skip: 100}, []string{"-n", "50", "--skip", "100"}},
 		{"explicit revs", LogOptions{Revs: []string{"main", "dev"}}, []string{"main", "dev"}},
-		{"all wins over revs", LogOptions{All: true, Revs: []string{"main"}}, []string{"--all"}},
+		{"all wins over revs", LogOptions{All: true, Revs: []string{"main"}}, []string{"--exclude=refs/stash", "--all"}},
 		{
 			"paths are separated by --",
 			LogOptions{All: true, Paths: []string{"src/", "README.md"}},
-			[]string{"--all", "--", "src/", "README.md"},
+			[]string{"--exclude=refs/stash", "--all", "--", "src/", "README.md"},
 		},
 	}
 	for _, tt := range tests {

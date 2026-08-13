@@ -3,6 +3,7 @@ import type { git, session } from '@wails/go/models'
 import {
   AbortMerge,
   AddRemote,
+  ApplyStash,
   CancelClone,
   Checkout,
   CheckoutCommit,
@@ -11,6 +12,7 @@ import {
   Conflicts,
   CreateBranch,
   DeleteBranch,
+  DropStash,
   Fetch,
   FinishMerge,
   GetHistory,
@@ -20,6 +22,7 @@ import {
   Merge,
   PreviewMerge,
   OpenRepo,
+  PopStash,
   Pull,
   Push,
   Refs,
@@ -29,6 +32,8 @@ import {
   ResolveLines,
   SelectRepo,
   StageFiles,
+  Stash,
+  Stashes,
   Status,
 } from '@wails/go/main/App'
 import { EventsOn } from '@wails/runtime/runtime'
@@ -44,6 +49,7 @@ interface State {
   gen: number
   loading: boolean
   refs: git.Ref[]
+  stashes: git.Stash[]
   status: git.Status | null
   error: string
   /** Set when the chosen folder exists but holds no repository yet. */
@@ -64,6 +70,7 @@ const state = reactive<State>({
   gen: 0,
   loading: false,
   refs: [],
+  stashes: [],
   status: null,
   error: '',
   initCandidate: '',
@@ -122,6 +129,7 @@ function reset() {
   state.count = 0
   state.width = 1
   state.refs = []
+  state.stashes = []
   state.status = null
   state.conflicts = []
 }
@@ -195,12 +203,14 @@ const cancelClone = () => CancelClone()
 async function refresh() {
   if (!state.info) return
   try {
-    const [refs, status, history] = await Promise.all([
+    const [refs, stashes, status, history] = await Promise.all([
       Refs(state.info.id),
+      Stashes(state.info.id),
       Status(state.info.id),
       GetHistory(state.info.id),
     ])
     state.refs = refs
+    state.stashes = stashes
     state.status = status
     state.gen = history.gen
     state.count = history.count
@@ -346,6 +356,12 @@ const finishMerge = (message: string) => act((id) => FinishMerge(id, message))
 const resolveConflict = (path: string, side: 'ours' | 'theirs') =>
   act((id) => ResolveConflict(id, path, side))
 
+const stash = (opts: git.StashOptions) => act((id) => Stash(id, opts))
+/** index restores what was staged as staged; git refuses the whole thing if it cannot. */
+const applyStash = (ref: string, index: boolean) => act((id) => ApplyStash(id, ref, index))
+const popStash = (ref: string, index: boolean) => act((id) => PopStash(id, ref, index))
+const dropStash = (ref: string) => act((id) => DropStash(id, ref))
+
 const checkout = (ref: git.Ref) => act((id) => Checkout(id, ref))
 const checkoutCommit = (hash: string) => act((id) => CheckoutCommit(id, hash))
 const createBranch = (opts: git.CreateBranchOptions) => act((id) => CreateBranch(id, opts))
@@ -367,6 +383,10 @@ export function useRepo() {
     createBranch,
     deleteBranch,
     renameBranch,
+    stash,
+    applyStash,
+    popStash,
+    dropStash,
     loadRemotes,
     addRemote,
     removeRemote,

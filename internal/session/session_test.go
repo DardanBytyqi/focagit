@@ -281,3 +281,31 @@ func TestCloseForgetsTheRepo(t *testing.T) {
 		t.Errorf("List() has %d entries after Close, want 0", got)
 	}
 }
+
+func TestOverlappingLoadsDoNotMix(t *testing.T) {
+	// Stashing starts two walks at once: one from the binding, one from the watcher.
+	dir := newRepo(t, 400)
+	s := New()
+	repo, _ := s.Open(context.Background(), dir)
+
+	if err := repo.Load(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	want := repo.Count()
+
+	for range 20 {
+		var wg sync.WaitGroup
+		for range 2 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_ = repo.Load(context.Background(), nil)
+			}()
+		}
+		wg.Wait()
+
+		if got := repo.Count(); got != want {
+			t.Fatalf("Count() = %d after two overlapping loads, want %d", got, want)
+		}
+	}
+}

@@ -26,8 +26,13 @@ const emit = defineEmits<{
   pull: []
   push: []
   pushOptions: []
+  stash: []
+  stashOptions: []
   settings: [section: string]
 }>()
+
+// Nothing to put away means the button would open a window that can only refuse.
+const dirty = computed(() => !!props.status?.files?.length)
 
 // An inherited identity is the one that commits under the wrong address.
 const inherited = computed(() => props.signature?.emailScope !== 'local')
@@ -109,6 +114,26 @@ const branchTitle = computed(() => {
     <button :disabled="!info" title="Create a branch from HEAD" @click="emit('branch')">
       Branch…
     </button>
+
+    <!-- Stash puts everything away; the arrow is for a message and the options. -->
+    <span class="split">
+      <button
+        class="split-main"
+        :disabled="!info || !dirty"
+        title="Put the working tree away and come back to it later"
+        @click="emit('stash')"
+      >
+        Stash
+      </button>
+      <button
+        class="split-more"
+        :disabled="!info || !dirty"
+        title="Stash with a message, or only part of it"
+        @click="emit('stashOptions')"
+      >
+        ▾
+      </button>
+    </span>
 
     <span class="spacer"></span>
 

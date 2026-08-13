@@ -54,7 +54,8 @@ func (o LogOptions) args() []string {
 		a = append(a, "--skip", strconv.Itoa(o.Skip))
 	}
 	if o.All {
-		a = append(a, "--all")
+		// A stash is three commits under refs/, and --all would draw all three.
+		a = append(a, "--exclude=refs/stash", "--all")
 	} else {
 		a = append(a, o.Revs...)
 	}

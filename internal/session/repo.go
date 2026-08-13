@@ -117,6 +117,11 @@ func (r *Repo) Load(ctx context.Context, onProgress func(gen, loaded, width int,
 	var batch []Entry
 	flush := func(done bool) {
 		r.mu.Lock()
+		// A newer walk owns the cache now; these entries belong to a history it replaced.
+		if r.gen != gen {
+			r.mu.Unlock()
+			return
+		}
 		r.entries = append(r.entries, batch...)
 		r.width = builder.Width()
 		total, width := len(r.entries), r.width
@@ -140,8 +145,11 @@ func (r *Repo) Load(ctx context.Context, onProgress func(gen, loaded, width int,
 	})
 
 	r.mu.Lock()
-	r.loading = false
-	r.loadErr = err
+	// Same reason: a cancelled walk must not report the newer one as finished.
+	if r.gen == gen {
+		r.loading = false
+		r.loadErr = err
+	}
 	r.mu.Unlock()
 
 	// Flush whatever is left even on failure: a partial history is more useful than none.
@@ -278,6 +286,32 @@ func (r *Repo) DiscardLines(ctx context.Context, path string, refs []patch.LineR
 // Commit records the staged changes.
 func (r *Repo) Commit(ctx context.Context, opts git.CommitOptions) error {
 	return r.git.Commit(ctx, opts)
+}
+
+// --- stash -------------------------------------------------------------------
+
+func (r *Repo) Stashes(ctx context.Context) ([]git.Stash, error) {
+	return r.git.Stashes(ctx)
+}
+
+func (r *Repo) Stash(ctx context.Context, opts git.StashOptions) error {
+	return r.git.Stash(ctx, opts)
+}
+
+func (r *Repo) ApplyStash(ctx context.Context, ref string, index bool) error {
+	return r.git.ApplyStash(ctx, ref, index)
+}
+
+func (r *Repo) PopStash(ctx context.Context, ref string, index bool) error {
+	return r.git.PopStash(ctx, ref, index)
+}
+
+func (r *Repo) DropStash(ctx context.Context, ref string) error {
+	return r.git.DropStash(ctx, ref)
+}
+
+func (r *Repo) StashFiles(ctx context.Context, ref string) ([]git.FileChange, error) {
+	return r.git.StashFiles(ctx, ref)
 }
 
 // --- branches ---------------------------------------------------------------

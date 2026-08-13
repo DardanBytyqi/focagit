@@ -497,6 +497,74 @@ func (a *App) RenameBranch(id, from, to string) error {
 	return repo.RenameBranch(a.ctx, from, to)
 }
 
+// --- stash --------------------------------------------------------------------
+
+// Stashes lists the stack for the sidebar.
+func (a *App) Stashes(id string) ([]git.Stash, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	return repo.Stashes(a.ctx)
+}
+
+// Stash puts the working tree away; the entry is a commit, so the graph changes.
+func (a *App) Stash(id string, opts git.StashOptions) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.Stash(a.ctx, opts); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// ApplyStash restores an entry and leaves it on the stack.
+func (a *App) ApplyStash(id, ref string, index bool) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	return repo.ApplyStash(a.ctx, ref, index)
+}
+
+// PopStash restores an entry and drops it, which removes its commit from the graph.
+func (a *App) PopStash(id, ref string, index bool) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.PopStash(a.ctx, ref, index); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// DropStash removes an entry without restoring it.
+func (a *App) DropStash(id, ref string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.DropStash(a.ctx, ref); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// StashFiles lists what an entry would change, for the detail pane.
+func (a *App) StashFiles(id, ref string) ([]git.FileChange, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	return repo.StashFiles(a.ctx, ref)
+}
+
 // --- remotes ------------------------------------------------------------------
 
 // Network is what a fetch or a push is doing right now, pushed as it happens.

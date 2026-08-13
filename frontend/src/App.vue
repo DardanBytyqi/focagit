@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import type { git } from '@wails/go/models'
+import { git } from '@wails/go/models'
 import { InitialRepo, InitialView } from '@wails/go/main/App'
 import BranchDialog from '@/components/branch/BranchDialog.vue'
 import DeleteBranchDialog from '@/components/branch/DeleteBranchDialog.vue'
@@ -15,6 +15,9 @@ import RemoteDialog from '@/components/remote/RemoteDialog.vue'
 import IdentityDialog from '@/components/settings/IdentityDialog.vue'
 import SettingsDialog from '@/components/settings/SettingsDialog.vue'
 import Sidebar from '@/components/shell/Sidebar.vue'
+import DropStashDialog from '@/components/stash/DropStashDialog.vue'
+import StashDialog from '@/components/stash/StashDialog.vue'
+import StashView from '@/components/stash/StashView.vue'
 import StatusBar from '@/components/shell/StatusBar.vue'
 import Toolbar from '@/components/shell/Toolbar.vue'
 import Welcome from '@/components/shell/Welcome.vue'
@@ -23,16 +26,60 @@ import { useDialogs } from '@/composables/useDialogs'
 import { usePrefs } from '@/composables/usePrefs'
 import { useRepo } from '@/composables/useRepo'
 
-const { state, refsByHash, open, browse, refresh, checkout, checkoutCommit, fetchAll, push, merge, pull } =
-  useRepo()
+const {
+  state,
+  refsByHash,
+  open,
+  browse,
+  refresh,
+  checkout,
+  checkoutCommit,
+  fetchAll,
+  push,
+  merge,
+  pull,
+  stash,
+  applyStash,
+  popStash,
+} = useRepo()
 const { state: prefsState, loadSignature } = usePrefs()
 const { loadAppearance } = useAppearance()
 const dialogs = useDialogs()
-const { open: dialog, branchRequest, deleteRequest, mergeDrop } = dialogs
+const { open: dialog, branchRequest, deleteRequest, mergeDrop, dropStashRequest } = dialogs
 
-/** The lower pane shows either a commit or the working tree. */
-const mode = ref<'commit' | 'changes'>('commit')
+/** The main area shows the history, the working tree, or one stash entry. */
+const mode = ref<'commit' | 'changes' | 'stash'>('commit')
 const changeCount = computed(() => state.status?.files?.length ?? 0)
+
+const shownStash = ref<git.Stash | null>(null)
+
+// The plain button takes everything, untracked included; the arrow is for the rest.
+const doStash = () => stash({ message: '', untracked: true, keepIndex: false, paths: [] })
+
+function showStash(s: git.Stash) {
+  shownStash.value = s
+  mode.value = 'stash'
+}
+
+// Dropped, popped, or gone from outside: there is nothing left on screen to act on.
+watch(
+  () => state.stashes,
+  (list) => {
+    const shown = shownStash.value
+    if (!shown || list.some((s) => s.hash === shown.hash)) return
+    shownStash.value = null
+    if (mode.value === 'stash') mode.value = 'commit'
+  },
+)
+
+// Restoring an entry puts the work back in the tree, which is where to look next.
+async function restoreStash(s: git.Stash, keep: boolean) {
+  const ok = keep ? await applyStash(s.ref, false) : await popStash(s.ref, false)
+  if (ok) {
+    shownStash.value = null
+    mode.value = 'changes'
+  }
+}
 
 // Who commits here is a property of the repository, so it is re-read on every open.
 watch(() => state.info?.id ?? null, loadSignature, { immediate: true })
@@ -105,6 +152,8 @@ onMounted(async () => {
       @pull="doPull"
       @push="doPush"
       @push-options="dialog.push = true"
+      @stash="doStash"
+      @stash-options="dialog.stash = true"
       @settings="dialogs.showSettings"
     />
 
@@ -114,6 +163,7 @@ onMounted(async () => {
       <Sidebar
         v-if="state.info"
         :refs="state.refs"
+        :stashes="state.stashes"
         :change-count="changeCount"
         :mode="mode"
         :head="state.status?.head ?? ''"
@@ -125,6 +175,10 @@ onMounted(async () => {
         @rename="dialogs.renameBranch"
         @remove="deleteRequest = { name: $event }"
         @add-remote="dialog.remote = true"
+        @show-stash="showStash"
+        @apply-stash="restoreStash($event, true)"
+        @pop-stash="restoreStash($event, false)"
+        @drop-stash="dropStashRequest = $event"
       />
 
       <main class="main">
@@ -134,6 +188,14 @@ onMounted(async () => {
             :repo-id="state.info.id"
             :status="state.status"
             @changed="refresh"
+          />
+          <StashView
+            v-else-if="mode === 'stash' && shownStash"
+            :repo-id="state.info.id"
+            :stash="shownStash"
+            @pop="restoreStash(shownStash, false)"
+            @apply="restoreStash(shownStash, true)"
+            @drop="dropStashRequest = shownStash"
           />
           <HistoryPane
             v-else
@@ -176,6 +238,8 @@ onMounted(async () => {
       @close="dialog.settings = false"
     />
     <RemoteDialog :open="dialog.remote" @close="dialog.remote = false" />
+    <StashDialog :open="dialog.stash" @close="dialog.stash = false" />
+    <DropStashDialog :stash="dropStashRequest" @close="dropStashRequest = null" />
     <MergeDropMenu :drop="mergeDrop" @merge="confirmMerge" @close="mergeDrop = null" />
     <ConflictView :open="dialog.conflicts" @close="dialog.conflicts = false" />
   </div>

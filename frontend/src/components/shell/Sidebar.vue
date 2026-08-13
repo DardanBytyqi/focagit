@@ -12,8 +12,10 @@ import type { git } from '@wails/go/models'
 
 const props = defineProps<{
   refs: git.Ref[]
+  stashes: git.Stash[]
   changeCount: number
-  mode: 'commit' | 'changes'
+  /** Stash is a mode too, so no nav item is highlighted while one is shown. */
+  mode: 'commit' | 'changes' | 'stash'
   /** The branch a merge would land on; empty when HEAD is detached. */
   head: string
 }>()
@@ -27,6 +29,10 @@ const emit = defineEmits<{
   rename: [name: string]
   remove: [name: string]
   addRemote: []
+  showStash: [s: git.Stash]
+  applyStash: [s: git.Stash]
+  popStash: [s: git.Stash]
+  dropStash: [s: git.Stash]
 }>()
 
 /** The ref under the pointer during a drag, and the row it is over. */
@@ -95,7 +101,7 @@ function canCheckout(r: git.Ref) {
 
 /** Sections mirror Fork's sidebar. */
 const sections = computed(() => [
-  { key: 'branch', title: 'Local', refs: props.refs.filter((r) => r.kind === 'branch') },
+  { key: 'branch', title: 'Branches', refs: props.refs.filter((r) => r.kind === 'branch') },
   { key: 'remote', title: 'Remotes', refs: props.refs.filter((r) => r.kind === 'remote') },
   { key: 'tag', title: 'Tags', refs: props.refs.filter((r) => r.kind === 'tag') },
 ])
@@ -205,6 +211,42 @@ function toggle(key: string) {
         <div v-if="!s.refs.length" class="empty muted">none</div>
       </div>
     </div>
+
+    <div class="section">
+      <div class="section-header" @click="toggle('stash')">
+        <span class="chevron" :class="{ closed: collapsed.stash }">▾</span>
+        Stashes
+        <span class="count muted">{{ stashes.length }}</span>
+      </div>
+
+      <div v-show="!collapsed.stash">
+        <ContextMenuRoot v-for="st in stashes" :key="st.ref">
+          <ContextMenuTrigger as-child>
+            <div class="ref" :title="st.message" @click="emit('showStash', st)">
+              <span class="ref-name">{{ st.message }}</span>
+            </div>
+          </ContextMenuTrigger>
+
+          <ContextMenuPortal>
+            <ContextMenuContent class="menu">
+              <!-- Pop is the common one, so it comes first. -->
+              <ContextMenuItem class="menu-item" @select="emit('popStash', st)">
+                Pop
+              </ContextMenuItem>
+              <ContextMenuItem class="menu-item" @select="emit('applyStash', st)">
+                Apply and keep
+              </ContextMenuItem>
+              <ContextMenuSeparator class="menu-sep" />
+              <ContextMenuItem class="menu-item danger" @select="emit('dropStash', st)">
+                Drop…
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenuPortal>
+        </ContextMenuRoot>
+
+        <div v-if="!stashes.length" class="empty muted">none</div>
+      </div>
+    </div>
   </aside>
 </template>
 
@@ -266,8 +308,6 @@ function toggle(key: string) {
   font-size: var(--fs-small);
   font-weight: 600;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   cursor: default;
 }
 
