@@ -242,7 +242,7 @@ function toggle(key: string) {
 .pill {
   margin-left: auto;
   background: var(--amber);
-  color: #1e1f22;
+  color: var(--bg);
 }
 
 .sidebar {

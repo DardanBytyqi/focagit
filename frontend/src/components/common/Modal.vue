@@ -39,7 +39,7 @@ const open = defineModel<boolean>('open', { required: true })
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 0.5);
+  background: var(--scrim);
   z-index: var(--z-modal);
 }
 
@@ -57,7 +57,7 @@ const open = defineModel<boolean>('open', { required: true })
   background: var(--bg-raised);
   border: 1px solid var(--border-strong);
   border-radius: 6px;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+  box-shadow: 0 12px 32px var(--shadow);
 }
 
 /* A set height, so the panes inside get the same room whatever the content is. */
@@ -148,7 +148,7 @@ const open = defineModel<boolean>('open', { required: true })
 .dialog .actions .danger {
   background: var(--red);
   border-color: var(--red);
-  color: #1e1f22;
+  color: var(--bg);
 }
 
 .dialog .actions .danger:hover:not(:disabled) {

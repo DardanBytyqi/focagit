@@ -3,7 +3,7 @@ import type { prefs } from '@wails/go/models'
 import { GetAppearance, SaveAppearance } from '@wails/go/main/App'
 
 /** The default has to exist here too: it is what the window shows before Go answers. */
-const fallback: prefs.Appearance = { theme: 'dark', density: 'normal', fontSize: 13 }
+const fallback: prefs.Appearance = { theme: 'dark', fontSize: 13 }
 
 const state = reactive<{ look: prefs.Appearance }>({ look: { ...fallback } })
 
@@ -19,7 +19,6 @@ function apply() {
   if (theme === 'light') root.setAttribute('data-theme', 'light')
   else root.removeAttribute('data-theme')
 
-  root.setAttribute('data-density', state.look.density)
   root.style.setProperty('--fs', `${state.look.fontSize}px`)
   root.style.setProperty('--fs-small', `${state.look.fontSize - 1}px`)
 }

@@ -10,12 +10,6 @@ const themes = [
   { value: 'system', label: 'Follow the desktop' },
 ]
 
-const densities = [
-  { value: 'compact', label: 'Compact', hint: 'more commits on screen' },
-  { value: 'normal', label: 'Normal', hint: '' },
-  { value: 'roomy', label: 'Roomy', hint: 'easier to hit with a trackpad' },
-]
-
 /** Every control writes the whole object, so there is one path into the store. */
 function set<K extends keyof typeof state.look>(key: K, value: (typeof state.look)[K]) {
   setAppearance({ ...state.look, [key]: value })
@@ -33,19 +27,6 @@ function set<K extends keyof typeof state.look>(key: K, value: (typeof state.loo
         @click="set('theme', t.value)"
       >
         {{ t.label }}
-      </button>
-    </div>
-
-    <label>Row height</label>
-    <div class="segmented">
-      <button
-        v-for="d in densities"
-        :key="d.value"
-        :title="d.hint"
-        :class="{ on: state.look.density === d.value }"
-        @click="set('density', d.value)"
-      >
-        {{ d.label }}
       </button>
     </div>
 

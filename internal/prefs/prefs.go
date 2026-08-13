@@ -35,15 +35,13 @@ type Identity struct {
 type Appearance struct {
 	// Theme is dark, light, or system to follow the desktop.
 	Theme string `json:"theme"`
-	// Density scales the row height: compact, normal or roomy.
-	Density string `json:"density"`
 	// FontSize is the base size in pixels; everything else is relative to it.
 	FontSize int `json:"fontSize"`
 }
 
 // DefaultAppearance is what a fresh installation looks like.
 func DefaultAppearance() Appearance {
-	return Appearance{Theme: "dark", Density: "normal", FontSize: 13}
+	return Appearance{Theme: "dark", FontSize: 13}
 }
 
 // normalise replaces anything unrecognised with the default.
@@ -53,11 +51,6 @@ func (a Appearance) normalise() Appearance {
 	case "dark", "light", "system":
 	default:
 		a.Theme = def.Theme
-	}
-	switch a.Density {
-	case "compact", "normal", "roomy":
-	default:
-		a.Density = def.Density
 	}
 	if a.FontSize < 10 || a.FontSize > 20 {
 		a.FontSize = def.FontSize

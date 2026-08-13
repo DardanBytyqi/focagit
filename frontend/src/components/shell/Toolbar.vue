@@ -247,7 +247,7 @@ const branchTitle = computed(() => {
 /* Amber like everywhere else, and legible on a disabled button. */
 .pill.behind {
   background: var(--amber);
-  color: #1e1f22;
+  color: var(--bg);
 }
 
 .identity {

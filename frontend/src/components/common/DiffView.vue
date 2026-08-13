@@ -205,7 +205,7 @@ function sign(kind: string): string {
 .hunk-actions .tiny {
   background: var(--bg-raised);
   border-color: var(--border-strong);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 4px var(--shadow);
 }
 
 .hunk-actions .tiny.danger:hover {
