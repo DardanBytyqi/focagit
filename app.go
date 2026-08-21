@@ -736,26 +736,26 @@ func (a *App) Pull(id string, opts git.PullOptions) (git.MergeResult, error) {
 	return res, nil
 }
 
-// AbortMerge throws the merge away and puts the working tree back.
-func (a *App) AbortMerge(id string) error {
+// AbortOperation throws away the merge, revert or cherry-pick left half-finished.
+func (a *App) AbortOperation(id string) error {
 	repo, err := a.session.Get(id)
 	if err != nil {
 		return err
 	}
-	if err := repo.AbortMerge(a.ctx); err != nil {
+	if err := repo.AbortOperation(a.ctx); err != nil {
 		return err
 	}
 	a.reload(repo)
 	return nil
 }
 
-// FinishMerge records the merge commit once nothing is conflicted.
-func (a *App) FinishMerge(id, message string) error {
+// FinishOperation records the commit that ends it, once nothing is conflicted.
+func (a *App) FinishOperation(id, message string) error {
 	repo, err := a.session.Get(id)
 	if err != nil {
 		return err
 	}
-	if err := repo.FinishMerge(a.ctx, message); err != nil {
+	if err := repo.FinishOperation(a.ctx, message); err != nil {
 		return err
 	}
 	a.reload(repo)
@@ -813,6 +813,59 @@ func (a *App) ResolveConflict(id, path, side string) error {
 		return err
 	}
 	if err := repo.Resolve(a.ctx, path, git.ConflictSide(side)); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// --- revert, cherry-pick and reset ---------------------------------------------
+
+// Revert records the opposite of a commit on top of HEAD.
+func (a *App) Revert(id string, opts git.ApplyOptions) (git.ApplyResult, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.ApplyResult{}, err
+	}
+	res, err := repo.Revert(a.ctx, opts)
+	if err != nil {
+		return git.ApplyResult{}, err
+	}
+	a.reload(repo)
+	return res, nil
+}
+
+// CherryPick replays a commit's change on top of HEAD.
+func (a *App) CherryPick(id string, opts git.ApplyOptions) (git.ApplyResult, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.ApplyResult{}, err
+	}
+	res, err := repo.CherryPick(a.ctx, opts)
+	if err != nil {
+		return git.ApplyResult{}, err
+	}
+	a.reload(repo)
+	return res, nil
+}
+
+// PreviewReset says what the branch would give up, for the window that has to warn.
+func (a *App) PreviewReset(id, rev string) (git.ResetPreview, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.ResetPreview{}, err
+	}
+	return repo.PreviewReset(a.ctx, rev)
+}
+
+// Reset moves the branch onto another commit. The mode is a plain string because
+// Wails cannot carry a named string type across the bridge.
+func (a *App) Reset(id, rev, mode string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.Reset(a.ctx, rev, git.ResetMode(mode)); err != nil {
 		return err
 	}
 	a.reload(repo)

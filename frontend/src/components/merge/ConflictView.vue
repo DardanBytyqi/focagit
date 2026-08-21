@@ -24,7 +24,7 @@ const isOpen = computed({
 })
 
 const mine = computed(() => state.status?.head ?? 'mine')
-const theirs = computed(() => state.status?.mergeFrom ?? 'theirs')
+const theirs = computed(() => state.status?.operationFrom ?? 'theirs')
 
 /** The file being shown, as the conflict list knows it. */
 const current = computed(() => state.conflicts.find((c) => c.path === path.value) ?? null)

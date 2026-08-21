@@ -11,11 +11,15 @@ defineProps<{
   width: number
   gen: number
   refsByHash: Map<string, git.Ref[]>
+  head: string
 }>()
 
 const emit = defineEmits<{
   branch: [start: string, label: string]
   checkout: [hash: string]
+  revert: [commit: git.Commit]
+  cherryPick: [commit: git.Commit]
+  reset: [commit: git.Commit]
 }>()
 
 /** Which commit the lower pane is showing; nothing else needs to know. */
@@ -32,9 +36,13 @@ const detailHeight = ref(340)
       :width="width"
       :gen="gen"
       :refs-by-hash="refsByHash"
+      :head="head"
       @select="selected = $event"
       @branch="(start, label) => emit('branch', start, label)"
       @checkout="emit('checkout', $event)"
+      @revert="emit('revert', $event)"
+      @cherry-pick="emit('cherryPick', $event)"
+      @reset="emit('reset', $event)"
     />
   </div>
 

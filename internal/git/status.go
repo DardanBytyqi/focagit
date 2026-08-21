@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -26,9 +24,9 @@ func (r *Repo) Status(ctx context.Context) (Status, error) {
 		st.Unpushed = r.UnpushedCount(ctx)
 	}
 	// Off disk rather than asking git: status is refreshed constantly.
-	if _, err := os.Stat(filepath.Join(r.gitDir, "MERGE_HEAD")); err == nil {
-		st.Merging = true
-		st.MergeFrom = r.MergeSource(ctx)
+	if op, hash := r.Operation(); op != OpNone {
+		st.Operation = op
+		st.OperationFrom = r.operationFrom(ctx, op, hash)
 	}
 	return st, nil
 }

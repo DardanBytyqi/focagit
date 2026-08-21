@@ -29,6 +29,19 @@ export interface DeleteRequest {
   name: string
 }
 
+/** An open confirmation for replaying a commit, one way round or the other. */
+export interface ApplyRequest {
+  kind: 'revert' | 'cherry-pick'
+  commit: git.Commit
+}
+
+/** An open confirmation for moving the current branch onto a commit. */
+export interface ResetRequest {
+  commit: git.Commit
+  /** The branch that would move; empty when HEAD is detached. */
+  branch: string
+}
+
 /** A branch dropped on another branch, and where the pointer let go. */
 export interface MergeDrop {
   source: git.Ref

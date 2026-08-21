@@ -27,6 +27,7 @@ func env() []string {
 		"GIT_PAGER=cat",         // never hand output to less and hang forever
 		"GIT_TERMINAL_PROMPT=0", // fail fast instead of blocking on a credential prompt
 		"GIT_OPTIONAL_LOCKS=0",  // read-only commands must not take index.lock
+		"GIT_EDITOR=true",       // --continue would open one and wait forever
 	)
 
 	// GIT_TERMINAL_PROMPT misses ssh, which asks on /dev/tty and blocks forever.

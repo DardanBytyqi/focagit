@@ -372,10 +372,26 @@ func (r *Repo) Pull(ctx context.Context, opts git.PullOptions, onProgress func(s
 	return r.git.Pull(ctx, opts, onProgress)
 }
 
-func (r *Repo) AbortMerge(ctx context.Context) error { return r.git.AbortMerge(ctx) }
+func (r *Repo) AbortOperation(ctx context.Context) error { return r.git.AbortOperation(ctx) }
 
-func (r *Repo) FinishMerge(ctx context.Context, message string) error {
-	return r.git.FinishMerge(ctx, message)
+func (r *Repo) FinishOperation(ctx context.Context, message string) error {
+	return r.git.FinishOperation(ctx, message)
+}
+
+func (r *Repo) Revert(ctx context.Context, opts git.ApplyOptions) (git.ApplyResult, error) {
+	return r.git.Revert(ctx, opts)
+}
+
+func (r *Repo) CherryPick(ctx context.Context, opts git.ApplyOptions) (git.ApplyResult, error) {
+	return r.git.CherryPick(ctx, opts)
+}
+
+func (r *Repo) PreviewReset(ctx context.Context, rev string) (git.ResetPreview, error) {
+	return r.git.PreviewReset(ctx, rev)
+}
+
+func (r *Repo) Reset(ctx context.Context, rev string, mode git.ResetMode) error {
+	return r.git.Reset(ctx, rev, mode)
 }
 
 func (r *Repo) Conflicts(ctx context.Context) ([]git.Conflict, error) {

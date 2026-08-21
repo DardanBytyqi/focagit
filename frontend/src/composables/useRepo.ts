@@ -1,12 +1,13 @@
 import { computed, reactive } from 'vue'
 import type { git, session } from '@wails/go/models'
 import {
-  AbortMerge,
+  AbortOperation,
   AddRemote,
   ApplyStash,
   CancelClone,
   Checkout,
   CheckoutCommit,
+  CherryPick,
   CloneRepo,
   ConflictText,
   Conflicts,
@@ -14,13 +15,14 @@ import {
   DeleteBranch,
   DropStash,
   Fetch,
-  FinishMerge,
+  FinishOperation,
   GetHistory,
   GetRemotes,
   InitRepo,
   Inspect,
   Merge,
   PreviewMerge,
+  PreviewReset,
   OpenRepo,
   PopStash,
   Pull,
@@ -28,8 +30,10 @@ import {
   Refs,
   RemoveRemote,
   RenameBranch,
+  Reset,
   ResolveConflict,
   ResolveLines,
+  Revert,
   SelectRepo,
   StageFiles,
   Stash,
@@ -215,8 +219,8 @@ async function refresh() {
     state.gen = history.gen
     state.count = history.count
     state.width = Math.max(1, history.width)
-    // Only a merge in progress can have conflicts, so nothing else is asked.
-    state.conflicts = status.merging ? await Conflicts(state.info.id) : []
+    // Only an operation in progress can have conflicts, so nothing else is asked.
+    state.conflicts = status.operation ? await Conflicts(state.info.id) : []
   } catch (e) {
     state.error = String(e)
   }
@@ -351,10 +355,27 @@ async function run<T>(fn: (id: string) => Promise<T>): Promise<T | null> {
   }
 }
 
-const abortMerge = () => act((id) => AbortMerge(id))
-const finishMerge = (message: string) => act((id) => FinishMerge(id, message))
+const abortOperation = () => act((id) => AbortOperation(id))
+const finishOperation = (message: string) => act((id) => FinishOperation(id, message))
 const resolveConflict = (path: string, side: 'ours' | 'theirs') =>
   act((id) => ResolveConflict(id, path, side))
+
+/** Both replay a commit, so both can end in the same conflicted state. */
+const revert = (opts: git.ApplyOptions) => run((id) => Revert(id, opts))
+const cherryPick = (opts: git.ApplyOptions) => run((id) => CherryPick(id, opts))
+
+const resetBranch = (rev: string, mode: string) => act((id) => Reset(id, rev, mode))
+
+/** What the branch would give up, for a window that has to warn before it moves. */
+async function previewReset(rev: string): Promise<git.ResetPreview | null> {
+  if (!state.info) return null
+  try {
+    return await PreviewReset(state.info.id, rev)
+  } catch (e) {
+    state.error = errorText(e)
+    return null
+  }
+}
 
 const stash = (opts: git.StashOptions) => act((id) => Stash(id, opts))
 /** index restores what was staged as staged; git refuses the whole thing if it cannot. */
@@ -395,8 +416,12 @@ export function useRepo() {
     merge,
     previewMerge,
     pull,
-    abortMerge,
-    finishMerge,
+    revert,
+    cherryPick,
+    resetBranch,
+    previewReset,
+    abortOperation,
+    finishOperation,
     resolveConflict,
     conflictText,
     resolveLines,

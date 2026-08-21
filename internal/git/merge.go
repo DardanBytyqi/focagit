@@ -11,8 +11,6 @@ import (
 var (
 	// ErrUnrelatedHistories means the two sides share no commit at all.
 	ErrUnrelatedHistories = errors.New("the two histories have nothing in common")
-	// ErrNoMerge means there is no merge to finish or abort.
-	ErrNoMerge = errors.New("no merge in progress")
 	// ErrUnresolved means files are still conflicted.
 	ErrUnresolved = errors.New("some files are still conflicted")
 	// ErrNoSide means the wanted side of a conflict does not exist.
@@ -182,39 +180,6 @@ func (r *Repo) Pull(ctx context.Context, opts PullOptions, onProgress func(strin
 		return MergeResult{}, err
 	}
 	return r.Merge(ctx, MergeOptions{Ref: st.Upstream, NoFastForward: opts.NoFastForward})
-}
-
-// AbortMerge puts the working tree back the way it was before the merge.
-func (r *Repo) AbortMerge(ctx context.Context) error {
-	if _, merging := r.MergeHead(ctx); !merging {
-		return ErrNoMerge
-	}
-	_, err := r.run.output(ctx, "merge", "--abort")
-	return err
-}
-
-// FinishMerge records the merge commit once every conflict is resolved.
-func (r *Repo) FinishMerge(ctx context.Context, message string) error {
-	if _, merging := r.MergeHead(ctx); !merging {
-		return ErrNoMerge
-	}
-	left, err := r.ConflictPaths(ctx)
-	if err != nil {
-		return err
-	}
-	if len(left) > 0 {
-		return fmt.Errorf("%w: %s", ErrUnresolved, strings.Join(left, ", "))
-	}
-
-	args := []string{"commit"}
-	if msg := strings.TrimSpace(message); msg != "" {
-		args = append(args, "-m", msg)
-	} else {
-		// --no-edit keeps the message git already wrote into MERGE_MSG.
-		args = append(args, "--no-edit")
-	}
-	_, err = r.run.output(ctx, args...)
-	return err
 }
 
 // MergeHead is the commit being merged in, and whether a merge is under way.

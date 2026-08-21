@@ -19,12 +19,17 @@ const props = defineProps<{
   /** Bumped by Go on every history walk; every cached page is stale after it. */
   gen: number
   refsByHash: Map<string, git.Ref[]>
+  /** The branch a reset would move; empty when HEAD is detached. */
+  head: string
 }>()
 
 const emit = defineEmits<{
   select: [commit: git.Commit]
   branch: [start: string, label: string]
   checkout: [hash: string]
+  revert: [commit: git.Commit]
+  cherryPick: [commit: git.Commit]
+  reset: [commit: git.Commit]
 }>()
 
 /** Virtualised list. */
@@ -282,6 +287,24 @@ onBeforeUnmount(() => observer?.disconnect())
               <ContextMenuSeparator class="menu-sep" />
               <ContextMenuItem class="menu-item" @select="emit('checkout', row.entry!.commit.hash)">
                 Checkout this commit
+              </ContextMenuItem>
+
+              <ContextMenuSeparator class="menu-sep" />
+              <ContextMenuItem class="menu-item" @select="emit('cherryPick', row.entry!.commit)">
+                Cherry-pick this commit…
+              </ContextMenuItem>
+              <ContextMenuItem class="menu-item" @select="emit('revert', row.entry!.commit)">
+                Revert this commit…
+              </ContextMenuItem>
+
+              <ContextMenuSeparator class="menu-sep" />
+              <!-- A reset moves a branch, so there has to be one to move. -->
+              <ContextMenuItem
+                class="menu-item danger"
+                :disabled="!head"
+                @select="emit('reset', row.entry!.commit)"
+              >
+                Reset {{ head || 'HEAD' }} to here…
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenuPortal>

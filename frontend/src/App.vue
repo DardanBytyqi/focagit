@@ -5,10 +5,12 @@ import { InitialRepo, InitialView } from '@wails/go/main/App'
 import BranchDialog from '@/components/branch/BranchDialog.vue'
 import DeleteBranchDialog from '@/components/branch/DeleteBranchDialog.vue'
 import ChangesView from '@/components/changes/ChangesView.vue'
+import ApplyCommitDialog from '@/components/history/ApplyCommitDialog.vue'
 import HistoryPane from '@/components/history/HistoryPane.vue'
+import ResetDialog from '@/components/history/ResetDialog.vue'
 import ConflictView from '@/components/merge/ConflictView.vue'
-import MergeBar from '@/components/merge/MergeBar.vue'
 import MergeDropMenu from '@/components/merge/MergeDropMenu.vue'
+import OperationBar from '@/components/merge/OperationBar.vue'
 import CloneDialog from '@/components/remote/CloneDialog.vue'
 import PushDialog from '@/components/remote/PushDialog.vue'
 import RemoteDialog from '@/components/remote/RemoteDialog.vue'
@@ -45,7 +47,15 @@ const {
 const { state: prefsState, loadSignature } = usePrefs()
 const { loadAppearance } = useAppearance()
 const dialogs = useDialogs()
-const { open: dialog, branchRequest, deleteRequest, mergeDrop, dropStashRequest } = dialogs
+const {
+  open: dialog,
+  branchRequest,
+  deleteRequest,
+  mergeDrop,
+  dropStashRequest,
+  applyRequest,
+  resetRequest,
+} = dialogs
 
 /** The main area shows the history, the working tree, or one stash entry. */
 const mode = ref<'commit' | 'changes' | 'stash'>('commit')
@@ -106,6 +116,11 @@ async function confirmMerge(noFastForward: boolean) {
   await merge({ ref: req.source.short, noFastForward, message: '' })
 }
 
+// A reset moves the branch HEAD is on, and says which one before it does.
+function askReset(commit: git.Commit) {
+  resetRequest.value = { commit, branch: state.status?.head ?? '' }
+}
+
 // The toolbar branches from wherever HEAD is, named for what the user sees.
 function branchFromHead() {
   const st = state.status
@@ -157,7 +172,7 @@ onMounted(async () => {
       @settings="dialogs.showSettings"
     />
 
-    <MergeBar v-if="state.status?.merging" @resolve="dialog.conflicts = true" />
+    <OperationBar v-if="state.status?.operation" @resolve="dialog.conflicts = true" />
 
     <div class="body">
       <Sidebar
@@ -204,8 +219,12 @@ onMounted(async () => {
             :width="state.width"
             :gen="state.gen"
             :refs-by-hash="refsByHash"
+            :head="state.status?.head ?? ''"
             @branch="dialogs.newBranch"
             @checkout="checkoutCommit"
+            @revert="applyRequest = { kind: 'revert', commit: $event }"
+            @cherry-pick="applyRequest = { kind: 'cherry-pick', commit: $event }"
+            @reset="askReset"
           />
         </template>
 
@@ -240,6 +259,8 @@ onMounted(async () => {
     <RemoteDialog :open="dialog.remote" @close="dialog.remote = false" />
     <StashDialog :open="dialog.stash" @close="dialog.stash = false" />
     <DropStashDialog :stash="dropStashRequest" @close="dropStashRequest = null" />
+    <ApplyCommitDialog :request="applyRequest" @close="applyRequest = null" />
+    <ResetDialog :request="resetRequest" @close="resetRequest = null" />
     <MergeDropMenu :drop="mergeDrop" @merge="confirmMerge" @close="mergeDrop = null" />
     <ConflictView :open="dialog.conflicts" @close="dialog.conflicts = false" />
   </div>

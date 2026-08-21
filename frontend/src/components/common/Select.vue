@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import {
   SelectContent,
   SelectItem,
@@ -10,17 +11,22 @@ import {
   SelectViewport,
 } from 'reka-ui'
 
-defineProps<{
-  options: { value: string; label: string; hint?: string }[]
+const props = defineProps<{
+  /** dot is a colour, for choices that carry a warning of their own. */
+  options: { value: string; label: string; hint?: string; dot?: string }[]
   placeholder?: string
 }>()
 
 const value = defineModel<string>({ required: true })
+
+// The trigger shows only the text, so the dot has to be looked up separately.
+const current = computed(() => props.options.find((o) => o.value === value.value))
 </script>
 
 <template>
   <SelectRoot v-model="value">
     <SelectTrigger class="trigger">
+      <span v-if="current?.dot" class="dot" :style="{ background: current.dot }"></span>
       <SelectValue :placeholder="placeholder ?? ''" />
       <span class="chevron">▾</span>
     </SelectTrigger>
@@ -29,6 +35,7 @@ const value = defineModel<string>({ required: true })
       <SelectContent class="content" position="popper" :side-offset="4">
         <SelectViewport>
           <SelectItem v-for="o in options" :key="o.value" :value="o.value" class="item">
+            <span v-if="o.dot" class="dot" :style="{ background: o.dot }"></span>
             <SelectItemText>{{ o.label }}</SelectItemText>
             <span v-if="o.hint" class="hint mono">{{ o.hint }}</span>
           </SelectItem>
@@ -64,6 +71,13 @@ const value = defineModel<string>({ required: true })
   color: var(--text-dim);
   font-size: 10px;
 }
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
 </style>
 
 <style>
@@ -94,6 +108,14 @@ const value = defineModel<string>({ required: true })
 
 .content .item[data-highlighted] {
   background: var(--bg-selected);
+}
+
+.content .item .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  align-self: center;
 }
 
 .content .item .hint {

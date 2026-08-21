@@ -90,11 +90,11 @@ type Status struct {
 	Unpushed int  `json:"unpushed"`
 	Behind   int  `json:"behind"`
 	Detached bool `json:"detached"`
-	// Merging is true between a conflicted merge and the commit that ends it.
-	Merging bool `json:"merging"`
-	// MergeFrom names the branch being merged in, empty when nothing is merging.
-	MergeFrom string       `json:"mergeFrom"`
-	Files     []FileStatus `json:"files"`
+	// Operation is the multi-step operation left open, empty when there is none.
+	Operation Operation `json:"operation"`
+	// OperationFrom names what that operation is applying.
+	OperationFrom string       `json:"operationFrom"`
+	Files         []FileStatus `json:"files"`
 }
 
 // IsClean reports whether there is nothing to commit and nothing untracked.

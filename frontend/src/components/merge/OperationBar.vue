@@ -4,32 +4,41 @@ import { useRepo } from '@/composables/useRepo'
 
 const emit = defineEmits<{ resolve: [] }>()
 
-const { state, abortMerge, finishMerge } = useRepo()
+const { state, abortOperation, finishOperation } = useRepo()
 
 const busy = ref(false)
 
+const op = computed(() => state.status?.operation ?? '')
 const left = computed(() => state.conflicts.length)
 const into = computed(() => state.status?.head ?? '')
-const from = computed(() => state.status?.mergeFrom ?? '')
+const from = computed(() => state.status?.operationFrom ?? '')
+
+const titles: Record<string, string> = {
+  merge: 'Merging',
+  revert: 'Reverting',
+  'cherry-pick': 'Cherry-picking',
+}
+const title = computed(() => titles[op.value] ?? 'In progress')
 
 async function finish() {
   busy.value = true
-  await finishMerge('')
+  await finishOperation('')
   busy.value = false
 }
 
 async function abort() {
   busy.value = true
-  await abortMerge()
+  await abortOperation()
   busy.value = false
 }
 </script>
 
 <template>
-  <div class="merge-bar">
-    <span class="title">Merging</span>
+  <div class="operation-bar">
+    <span class="title">{{ title }}</span>
     <span class="what">
-      <b class="theirs">{{ from }}</b> into <b class="mine">{{ into }}</b>
+      <b class="theirs">{{ from }}</b>
+      <template v-if="op === 'merge'"> into <b class="mine">{{ into }}</b></template>
     </span>
 
     <span class="count" :class="{ done: !left }">
@@ -43,13 +52,13 @@ async function abort() {
       Resolve conflicts
     </button>
     <button v-else type="button" class="primary" :disabled="busy" @click="finish">
-      Commit merge
+      {{ op === 'merge' ? 'Commit merge' : 'Continue' }}
     </button>
   </div>
 </template>
 
 <style scoped>
-.merge-bar {
+.operation-bar {
   display: flex;
   align-items: center;
   gap: 10px;

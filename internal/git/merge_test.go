@@ -189,8 +189,8 @@ func TestMergeConflict(t *testing.T) {
 		if _, err := repo.Merge(ctx, MergeOptions{Ref: "altro"}); err != nil {
 			t.Fatal(err)
 		}
-		if err := repo.AbortMerge(ctx); err != nil {
-			t.Fatalf("AbortMerge: %v", err)
+		if err := repo.AbortOperation(ctx); err != nil {
+			t.Fatalf("AbortOperation: %v", err)
 		}
 		if _, merging := repo.MergeHead(ctx); merging {
 			t.Error("the merge is still in progress after abort")
@@ -206,8 +206,8 @@ func TestMergeConflict(t *testing.T) {
 
 	t.Run("aborting when nothing is merging says so", func(t *testing.T) {
 		repo, _, _ := mergeRepo(t)
-		if err := repo.AbortMerge(ctx); !errors.Is(err, ErrNoMerge) {
-			t.Errorf("AbortMerge: got %v, want ErrNoMerge", err)
+		if err := repo.AbortOperation(ctx); !errors.Is(err, ErrNoOperation) {
+			t.Errorf("AbortOperation: got %v, want ErrNoOperation", err)
 		}
 	})
 
@@ -227,8 +227,8 @@ func TestMergeConflict(t *testing.T) {
 		if len(left) != 0 {
 			t.Errorf("still conflicted: %v", left)
 		}
-		if err := repo.FinishMerge(ctx, ""); err != nil {
-			t.Fatalf("FinishMerge: %v", err)
+		if err := repo.FinishOperation(ctx, ""); err != nil {
+			t.Fatalf("FinishOperation: %v", err)
 		}
 		if _, merging := repo.MergeHead(ctx); merging {
 			t.Error("the merge did not finish")
@@ -240,8 +240,8 @@ func TestMergeConflict(t *testing.T) {
 		if _, err := repo.Merge(ctx, MergeOptions{Ref: "altro"}); err != nil {
 			t.Fatal(err)
 		}
-		if err := repo.FinishMerge(ctx, ""); !errors.Is(err, ErrUnresolved) {
-			t.Errorf("FinishMerge: got %v, want ErrUnresolved", err)
+		if err := repo.FinishOperation(ctx, ""); !errors.Is(err, ErrUnresolved) {
+			t.Errorf("FinishOperation: got %v, want ErrUnresolved", err)
 		}
 	})
 
@@ -281,8 +281,8 @@ func TestMergeConflict(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(repo.Root(), "shared.txt")); !os.IsNotExist(err) {
 			t.Error("the file our side deleted is still there")
 		}
-		if err := repo.FinishMerge(ctx, "unito"); err != nil {
-			t.Fatalf("FinishMerge: %v", err)
+		if err := repo.FinishOperation(ctx, "unito"); err != nil {
+			t.Fatalf("FinishOperation: %v", err)
 		}
 	})
 }
