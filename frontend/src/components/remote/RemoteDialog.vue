@@ -31,7 +31,8 @@ watch(
   <Modal v-model:open="isOpen" title="Add remote">
     <RemoteForm :active="open" @added="emit('close')" @cancel="emit('close')" />
     <p v-if="state.remotes.length" class="hint">
-      Already configured: <span class="mono">{{ state.remotes.map((r) => r.name).join(', ') }}</span>
+      Already configured:
+      <span class="mono">{{ state.remotes.map((r) => r.name).join(', ') }}</span>
     </p>
   </Modal>
 </template>

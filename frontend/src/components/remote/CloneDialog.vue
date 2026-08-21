@@ -125,11 +125,7 @@ async function submit() {
 
       <p v-if="state.busy" class="hint mono progress">{{ state.network || 'Starting…' }}</p>
 
-      <TrustHost
-        v-if="isUnknownHost(state.error)"
-        :host="remoteHost(url)"
-        @trusted="submit"
-      />
+      <TrustHost v-if="isUnknownHost(state.error)" :host="remoteHost(url)" @trusted="submit" />
       <p v-else-if="state.error" class="error">{{ state.error }}</p>
 
       <div class="actions">

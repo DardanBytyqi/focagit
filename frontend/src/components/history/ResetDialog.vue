@@ -92,7 +92,12 @@ async function confirm() {
 
       <div class="actions">
         <button type="button" @click="emit('close')">Cancel</button>
-        <button type="button" :class="hard ? 'danger' : 'primary'" :disabled="busy" @click="confirm">
+        <button
+          type="button"
+          :class="hard ? 'danger' : 'primary'"
+          :disabled="busy"
+          @click="confirm"
+        >
           Reset
         </button>
       </div>

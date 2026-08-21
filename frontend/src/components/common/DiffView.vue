@@ -51,9 +51,7 @@ const blocks = computed<Block[]>(() => {
   return out
 })
 
-const totalLines = computed(() =>
-  (props.diff?.hunks ?? []).reduce((n, h) => n + h.lines.length, 0),
-)
+const totalLines = computed(() => (props.diff?.hunks ?? []).reduce((n, h) => n + h.lines.length, 0))
 const hiddenLines = computed(() =>
   Math.max(0, totalLines.value - blocks.value.reduce((n, b) => n + b.lines.length, 0)),
 )
@@ -64,7 +62,10 @@ function changed(l: git.DiffLine): boolean {
 
 /** Anchor for shift-click ranges, reset whenever the file changes. */
 const anchor = ref<{ hunk: number; line: number } | null>(null)
-watch(() => props.diff, () => (anchor.value = null))
+watch(
+  () => props.diff,
+  () => (anchor.value = null),
+)
 
 function onLineClick(hunkIndex: number, lineIndex: number, e: MouseEvent) {
   if (!props.selectable) return
@@ -113,7 +114,8 @@ function sign(kind: string): string {
           <span class="range"
             >@@ -{{ b.hunk.oldStart }},{{ b.hunk.oldLines }} +{{ b.hunk.newStart }},{{
               b.hunk.newLines
-            }} @@</span
+            }}
+            @@</span
           >
           <span v-if="b.hunk.header" class="heading">{{ b.hunk.header }}</span>
         </div>
@@ -123,11 +125,7 @@ function sign(kind: string): string {
         <div v-if="selectable" class="hunk-actions">
           <button class="tiny" @click="selectHunk(b)">Select</button>
           <button class="tiny" @click="emit('hunk', b.index)">{{ hunkAction }}</button>
-          <button
-            v-if="discardable"
-            class="tiny danger"
-            @click="emit('discardHunk', b.index)"
-          >
+          <button v-if="discardable" class="tiny danger" @click="emit('discardHunk', b.index)">
             Discard
           </button>
         </div>

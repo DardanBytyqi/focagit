@@ -70,7 +70,12 @@ function markClass(f: git.FileStatus, staged: boolean): string {
         <button class="tiny" :disabled="busy" @click.stop="emit('action', n)">
           {{ staged ? '−' : '+' }}
         </button>
-        <button v-if="!staged" class="tiny danger" :disabled="busy" @click.stop="emit('discard', n)">
+        <button
+          v-if="!staged"
+          class="tiny danger"
+          :disabled="busy"
+          @click.stop="emit('discard', n)"
+        >
           ✕
         </button>
       </span>
@@ -104,7 +109,12 @@ function markClass(f: git.FileStatus, staged: boolean): string {
         <button class="tiny" :disabled="busy" @click.stop="emit('action', n)">
           {{ staged ? '−' : '+' }}
         </button>
-        <button v-if="!staged" class="tiny danger" :disabled="busy" @click.stop="emit('discard', n)">
+        <button
+          v-if="!staged"
+          class="tiny danger"
+          :disabled="busy"
+          @click.stop="emit('discard', n)"
+        >
           ✕
         </button>
       </span>

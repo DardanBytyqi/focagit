@@ -137,22 +137,13 @@ async function submit() {
         <li v-for="line in done" :key="line" class="mono">{{ line }}</li>
       </ul>
 
-      <TrustHost
-        v-if="isUnknownHost(state.error)"
-        :host="host"
-        @trusted="retryAfterTrust"
-      />
+      <TrustHost v-if="isUnknownHost(state.error)" :host="host" @trusted="retryAfterTrust" />
 
       <div v-else-if="problem" class="field">
         <p class="error">{{ problem.text }}</p>
         <p v-if="problem.hint" class="hint">{{ problem.hint }}</p>
         <!-- Over SSH, "who are you" is nearly always a key the agent is not holding. -->
-        <button
-          v-if="isAuthFailure(state.error)"
-          type="button"
-          class="link"
-          @click="emit('ssh')"
-        >
+        <button v-if="isAuthFailure(state.error)" type="button" class="link" @click="emit('ssh')">
           Check your SSH keys…
         </button>
       </div>

@@ -181,11 +181,7 @@ function toggle(key: string) {
               </ContextMenuItem>
 
               <!-- Merging a branch into itself is the one thing it cannot do. -->
-              <ContextMenuItem
-                v-if="canMerge(r)"
-                class="menu-item"
-                @select="emit('merge', r)"
-              >
+              <ContextMenuItem v-if="canMerge(r)" class="menu-item" @select="emit('merge', r)">
                 Merge {{ r.short }} into {{ head }}
               </ContextMenuItem>
 

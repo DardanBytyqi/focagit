@@ -79,11 +79,7 @@ const branchTitle = computed(() => {
       Fetch
     </button>
 
-    <button
-      :disabled="!info || busy"
-      title="Fetch and merge the upstream"
-      @click="emit('pull')"
-    >
+    <button :disabled="!info || busy" title="Fetch and merge the upstream" @click="emit('pull')">
       Pull
       <span v-if="behind" class="pill behind">{{ behind }}</span>
     </button>
@@ -304,7 +300,6 @@ const branchTitle = computed(() => {
 .identity.unset .dot {
   background: var(--red);
 }
-
 
 .branch {
   display: flex;

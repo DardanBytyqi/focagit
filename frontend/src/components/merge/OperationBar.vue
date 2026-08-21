@@ -38,7 +38,9 @@ async function abort() {
     <span class="title">{{ title }}</span>
     <span class="what">
       <b class="theirs">{{ from }}</b>
-      <template v-if="op === 'merge'"> into <b class="mine">{{ into }}</b></template>
+      <template v-if="op === 'merge'">
+        into <b class="mine">{{ into }}</b></template
+      >
     </span>
 
     <span class="count" :class="{ done: !left }">

@@ -146,14 +146,24 @@ async function act(fn: () => Promise<void>) {
   }
 }
 
-const stageAll = () => act(() => StageFiles(props.repoId, unstaged.value.map((f) => f.path)))
-const unstageAll = () => act(() => UnstageFiles(props.repoId, staged.value.map((f) => f.path)))
+const stageAll = () =>
+  act(() =>
+    StageFiles(
+      props.repoId,
+      unstaged.value.map((f) => f.path),
+    ),
+  )
+const unstageAll = () =>
+  act(() =>
+    UnstageFiles(
+      props.repoId,
+      staged.value.map((f) => f.path),
+    ),
+  )
 
 function apply(paths: string[], isStaged: boolean) {
   if (!paths.length) return
-  return act(() =>
-    isStaged ? UnstageFiles(props.repoId, paths) : StageFiles(props.repoId, paths),
-  )
+  return act(() => (isStaged ? UnstageFiles(props.repoId, paths) : StageFiles(props.repoId, paths)))
 }
 
 /** The pane header button: acts on what is selected, not on everything. */
@@ -390,18 +400,18 @@ watch(
             />
             <span class="counter" :class="{ warn: summaryTooLong }">{{ summary.length }}</span>
           </div>
-          <textarea
-            v-model="description"
-            class="description"
-            placeholder="Description"
-          ></textarea>
+          <textarea v-model="description" class="description" placeholder="Description"></textarea>
         </div>
 
         <div class="commit-row">
           <Check v-model="amend" class="amend">Amend</Check>
           <span class="spacer"></span>
           <button class="primary" :disabled="!canCommit" @click="commit">
-            {{ amend ? 'Amend Commit' : `Commit ${staged.length} File${staged.length === 1 ? '' : 's'}` }}
+            {{
+              amend
+                ? 'Amend Commit'
+                : `Commit ${staged.length} File${staged.length === 1 ? '' : 's'}`
+            }}
           </button>
         </div>
       </div>

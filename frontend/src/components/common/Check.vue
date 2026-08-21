@@ -58,7 +58,9 @@ const checked = defineModel<boolean>({ required: true })
   background: var(--bg);
   border: 1px solid var(--border-strong);
   border-radius: 3px;
-  transition: background 90ms, border-color 90ms;
+  transition:
+    background 90ms,
+    border-color 90ms;
 }
 
 .checkbox:hover:not(:disabled) .box {

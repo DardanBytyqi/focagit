@@ -58,10 +58,7 @@ async function submit() {
 </script>
 
 <template>
-  <Modal
-    v-model:open="open"
-    :title="request?.kind === 'rename' ? 'Rename branch' : 'New branch'"
-  >
+  <Modal v-model:open="open" :title="request?.kind === 'rename' ? 'Rename branch' : 'New branch'">
     <form @submit.prevent="submit">
       <label for="branch-name">Branch name</label>
       <input id="branch-name" ref="input" v-model="name" type="text" autofocus />

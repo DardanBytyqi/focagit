@@ -56,9 +56,7 @@ const pages = ref(new Map<number, session.Entry[]>())
 const partial = new Set<number>()
 const inflight = new Set<number>()
 
-const firstIndex = computed(() =>
-  Math.max(0, Math.floor(scrollTop.value / ROW) - OVERSCAN),
-)
+const firstIndex = computed(() => Math.max(0, Math.floor(scrollTop.value / ROW) - OVERSCAN))
 const lastIndex = computed(() =>
   Math.min(props.count, firstIndex.value + Math.ceil(viewportHeight.value / ROW) + OVERSCAN * 2),
 )
@@ -248,65 +246,65 @@ onBeforeUnmount(() => observer?.disconnect())
       <div class="spacer" :style="{ height: totalHeight + 'px' }">
         <ContextMenuRoot v-for="row in rows" :key="row.index">
           <ContextMenuTrigger as-child :disabled="!row.entry">
-        <div
-          class="row"
-          :class="{ selected: row.entry && row.entry.commit.hash === selected }"
-          :style="{ transform: `translateY(${row.index * ROW}px)` }"
-          @click="row.entry && select(row.entry)"
-        >
-          <template v-if="row.entry">
-            <svg class="graph" :width="graphWidth" :height="ROW">
-              <!-- Lanes crossing this row, drawn first so the dot sits on top -->
-              <path
-                v-for="(l, i) in row.entry.graph.pass"
-                :key="`p${i}`"
-                :d="passPath(l.lane)"
-                :stroke="laneColor(l.color)"
-              />
-              <path
-                v-for="(l, i) in row.entry.graph.in"
-                :key="`i${i}`"
-                :d="inPath(l.lane, row.entry.graph.lane)"
-                :stroke="laneColor(l.color)"
-              />
-              <path
-                v-for="(l, i) in row.entry.graph.out"
-                :key="`o${i}`"
-                :d="outPath(row.entry.graph.lane, l.lane)"
-                :stroke="laneColor(l.color)"
-              />
-              <circle
-                :cx="x(row.entry.graph.lane)"
-                :cy="MID"
-                :r="row.entry.graph.merge ? 3.2 : 3.8"
-                :fill="row.entry.graph.merge ? 'var(--bg)' : laneColor(row.entry.graph.color)"
-                :stroke="laneColor(row.entry.graph.color)"
-                stroke-width="2"
-              />
-            </svg>
+            <div
+              class="row"
+              :class="{ selected: row.entry && row.entry.commit.hash === selected }"
+              :style="{ transform: `translateY(${row.index * ROW}px)` }"
+              @click="row.entry && select(row.entry)"
+            >
+              <template v-if="row.entry">
+                <svg class="graph" :width="graphWidth" :height="ROW">
+                  <!-- Lanes crossing this row, drawn first so the dot sits on top -->
+                  <path
+                    v-for="(l, i) in row.entry.graph.pass"
+                    :key="`p${i}`"
+                    :d="passPath(l.lane)"
+                    :stroke="laneColor(l.color)"
+                  />
+                  <path
+                    v-for="(l, i) in row.entry.graph.in"
+                    :key="`i${i}`"
+                    :d="inPath(l.lane, row.entry.graph.lane)"
+                    :stroke="laneColor(l.color)"
+                  />
+                  <path
+                    v-for="(l, i) in row.entry.graph.out"
+                    :key="`o${i}`"
+                    :d="outPath(row.entry.graph.lane, l.lane)"
+                    :stroke="laneColor(l.color)"
+                  />
+                  <circle
+                    :cx="x(row.entry.graph.lane)"
+                    :cy="MID"
+                    :r="row.entry.graph.merge ? 3.2 : 3.8"
+                    :fill="row.entry.graph.merge ? 'var(--bg)' : laneColor(row.entry.graph.color)"
+                    :stroke="laneColor(row.entry.graph.color)"
+                    stroke-width="2"
+                  />
+                </svg>
 
-            <span class="col-subject">
-              <span
-                v-for="r in props.refsByHash.get(row.entry.commit.hash) ?? []"
-                :key="r.name"
-                class="badge"
-                :class="r.kind"
-                >{{ r.short }}</span
-              >
-              {{ row.entry.commit.subject }}
-            </span>
+                <span class="col-subject">
+                  <span
+                    v-for="r in props.refsByHash.get(row.entry.commit.hash) ?? []"
+                    :key="r.name"
+                    class="badge"
+                    :class="r.kind"
+                    >{{ r.short }}</span
+                  >
+                  {{ row.entry.commit.subject }}
+                </span>
 
-            <span class="col-author muted">{{ row.entry.commit.author.name }}</span>
-            <span class="col-date muted">{{ formatDate(row.entry.commit.author.when) }}</span>
-            <span class="col-hash mono muted">{{ row.entry.commit.hash.slice(0, 7) }}</span>
-          </template>
+                <span class="col-author muted">{{ row.entry.commit.author.name }}</span>
+                <span class="col-date muted">{{ formatDate(row.entry.commit.author.when) }}</span>
+                <span class="col-hash mono muted">{{ row.entry.commit.hash.slice(0, 7) }}</span>
+              </template>
 
-          <!-- The page for this row has not arrived yet. -->
-          <template v-else>
-            <span></span>
-            <span class="placeholder"></span>
-          </template>
-        </div>
+              <!-- The page for this row has not arrived yet. -->
+              <template v-else>
+                <span></span>
+                <span class="placeholder"></span>
+              </template>
+            </div>
           </ContextMenuTrigger>
 
           <ContextMenuPortal v-if="row.entry">

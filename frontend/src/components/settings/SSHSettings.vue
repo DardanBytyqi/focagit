@@ -68,7 +68,9 @@ async function copyKey(text: string) {
 
     <!-- A brand new key is useless until it is on GitHub, so it is put in the way. -->
     <section v-if="state.fresh" class="fresh">
-      <p><b>{{ state.fresh.name }}</b> is ready. GitHub needs its public half:</p>
+      <p>
+        <b>{{ state.fresh.name }}</b> is ready. GitHub needs its public half:
+      </p>
       <pre class="pub mono">{{ state.fresh.public }}</pre>
       <div class="actions">
         <button @click="copyKey(state.fresh.public)">
@@ -108,7 +110,6 @@ async function copyKey(text: string) {
     <p v-if="!usable.length && state.keys.length && !state.fresh" class="hint warn">
       No key is loaded, so pushing over SSH will fail.
     </p>
-
   </div>
 </template>
 

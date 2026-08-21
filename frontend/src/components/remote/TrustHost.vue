@@ -15,7 +15,8 @@ const show = ref(false)
 
 /** Where the host publishes its fingerprints, for the ones we know of. */
 const docs: Record<string, string> = {
-  'github.com': 'https://docs.github.com/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints',
+  'github.com':
+    'https://docs.github.com/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints',
   'gitlab.com': 'https://docs.gitlab.com/ee/user/gitlab_com/#ssh-known_hosts-entries',
 }
 
@@ -56,7 +57,10 @@ async function trust() {
 <template>
   <div class="trust">
     <div class="row">
-      <p class="text">First connection to <b>{{ host }}</b>.</p>
+      <p class="text">
+        First connection to <b>{{ host }}</b
+        >.
+      </p>
       <button type="button" class="primary" :disabled="!keys.length || busy" @click="trust">
         Trust
       </button>
