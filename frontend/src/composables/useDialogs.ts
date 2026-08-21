@@ -1,6 +1,13 @@
 import { computed, reactive, ref } from 'vue'
 import type { git } from '@wails/go/models'
-import type { ApplyRequest, BranchRequest, DeleteRequest, MergeDrop, ResetRequest } from '@/types'
+import type {
+  ApplyRequest,
+  BranchRequest,
+  DeleteRequest,
+  MergeDrop,
+  ResetRequest,
+  TagRequest,
+} from '@/types'
 
 /**
  * Which windows are open. Kept in one place because they are not independent:
@@ -27,6 +34,8 @@ const mergeDrop = ref<MergeDrop | null>(null)
 const dropStashRequest = ref<git.Stash | null>(null)
 const applyRequest = ref<ApplyRequest | null>(null)
 const resetRequest = ref<ResetRequest | null>(null)
+const tagRequest = ref<TagRequest | null>(null)
+const deleteTagRequest = ref<git.Tag | null>(null)
 
 /** An error shown inside a window does not need repeating in the status bar. */
 const anyOpen = computed(() => Object.values(open).some(Boolean))
@@ -60,6 +69,8 @@ export function useDialogs() {
     dropStashRequest,
     applyRequest,
     resetRequest,
+    tagRequest,
+    deleteTagRequest,
     anyOpen,
     showSettings,
     showSSH,

@@ -330,6 +330,24 @@ func (r *Repo) StashFiles(ctx context.Context, ref string) ([]git.FileChange, er
 	return r.git.StashFiles(ctx, ref)
 }
 
+// --- tags --------------------------------------------------------------------
+
+func (r *Repo) Tags(ctx context.Context) ([]git.Tag, error) {
+	return r.git.Tags(ctx)
+}
+
+func (r *Repo) CreateTag(ctx context.Context, opts git.TagOptions) error {
+	return r.git.CreateTag(ctx, opts)
+}
+
+func (r *Repo) DeleteTag(ctx context.Context, name string) error {
+	return r.git.DeleteTag(ctx, name)
+}
+
+func (r *Repo) PushTag(ctx context.Context, remote, name string, remove bool, onProgress func(string)) ([]git.PushResult, error) {
+	return r.git.PushTag(ctx, remote, name, remove, onProgress)
+}
+
 // --- branches ---------------------------------------------------------------
 
 func (r *Repo) Checkout(ctx context.Context, branch string) error {

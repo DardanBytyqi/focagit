@@ -829,6 +829,58 @@ func (a *App) ResolveConflict(id, path, side string) error {
 	return nil
 }
 
+// --- tags ----------------------------------------------------------------------
+
+// Tags lists refs/tags for the sidebar, highest version first.
+func (a *App) Tags(id string) ([]git.Tag, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	return repo.Tags(a.ctx)
+}
+
+// CreateTag names a commit; the graph gains a label, so the history is re-read.
+func (a *App) CreateTag(id string, opts git.TagOptions) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.CreateTag(a.ctx, opts); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// DeleteTag removes it here; a copy already pushed stays on the remote.
+func (a *App) DeleteTag(id, name string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.DeleteTag(a.ctx, name); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// PushTag sends one tag to a remote, or removes the remote's copy of it.
+func (a *App) PushTag(id, remote, name string, remove bool) ([]git.PushResult, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := repo.PushTag(a.ctx, remote, name, remove, a.report(id, "push"))
+	runtime.EventsEmit(a.ctx, "repo:network", Network{ID: id, Op: "push", Done: true, Error: errText(err)})
+	if res == nil {
+		res = []git.PushResult{}
+	}
+	return res, err
+}
+
 // --- revert, cherry-pick and reset ---------------------------------------------
 
 // Revert records the opposite of a commit on top of HEAD.

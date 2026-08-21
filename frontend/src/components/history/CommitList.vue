@@ -11,6 +11,7 @@ import {
 import type { git, session } from '@wails/go/models'
 import { CommitIndex, CommitRange } from '@wails/go/main/App'
 import { formatDate } from '@/utils/format'
+import RefIcon from '@/components/shell/RefIcon.vue'
 
 const props = defineProps<{
   repoId: string
@@ -29,6 +30,7 @@ const emit = defineEmits<{
   select: [commit: git.Commit]
   branch: [start: string, label: string]
   checkout: [hash: string]
+  tag: [commit: git.Commit]
   revert: [commit: git.Commit]
   cherryPick: [commit: git.Commit]
   reset: [commit: git.Commit]
@@ -289,9 +291,16 @@ onBeforeUnmount(() => observer?.disconnect())
                     :key="r.name"
                     class="badge"
                     :class="r.kind"
-                    >{{ r.short }}</span
                   >
-                  {{ row.entry.commit.subject }}
+                    <!-- The checked out branch shows a tick where the others show their kind. -->
+                    <span v-if="r.head" class="head">✓</span>
+                    <RefIcon
+                      v-else
+                      :kind="r.kind === 'remote' ? 'remote' : r.kind === 'tag' ? 'tag' : 'branch'"
+                    />
+                    {{ r.short }}
+                  </span>
+                  <span class="subject-text">{{ row.entry.commit.subject }}</span>
                 </span>
 
                 <span class="col-author muted">{{ row.entry.commit.author.name }}</span>
@@ -318,6 +327,11 @@ onBeforeUnmount(() => observer?.disconnect())
               <ContextMenuSeparator class="menu-sep" />
               <ContextMenuItem class="menu-item" @select="emit('checkout', row.entry!.commit.hash)">
                 Checkout this commit
+              </ContextMenuItem>
+
+              <ContextMenuSeparator class="menu-sep" />
+              <ContextMenuItem class="menu-item" @select="emit('tag', row.entry!.commit)">
+                Tag this commit…
               </ContextMenuItem>
 
               <ContextMenuSeparator class="menu-sep" />
@@ -406,7 +420,17 @@ onBeforeUnmount(() => observer?.disconnect())
   stroke-width: 1.6;
 }
 
+/* Flex, so the badges sit centred against the subject instead of on its baseline. */
 .col-subject {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.subject-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -418,29 +442,51 @@ onBeforeUnmount(() => observer?.disconnect())
   font-size: var(--fs-small);
 }
 
+/* The glyph says which kind it is, the colour says it from further away. */
 .badge {
-  display: inline-block;
-  padding: 0 5px;
-  margin-right: 5px;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 5px;
+  height: 18px;
+  padding: 0 9px;
   border-radius: 3px;
   font-size: 11px;
-  vertical-align: 1px;
-  background: var(--bg-toolbar);
+  line-height: 1;
+  background: var(--bg);
   border: 1px solid var(--border-strong);
+  color: var(--text);
 }
 
+.badge .ref-icon {
+  width: 11px;
+  height: 11px;
+}
+
+/* The colour is on the border and the glyph; the name stays as readable as the subject. */
 .badge.branch {
-  color: var(--green);
   border-color: var(--green);
 }
 
-.badge.remote {
-  color: var(--text-muted);
+.badge.branch .ref-icon {
+  color: var(--green);
 }
 
 .badge.tag {
-  color: var(--amber);
   border-color: var(--amber);
+}
+
+.badge.tag .ref-icon {
+  color: var(--amber);
+}
+
+.badge.remote .ref-icon {
+  color: var(--text-muted);
+}
+
+.badge .head {
+  color: var(--green);
+  font-weight: 700;
 }
 
 .placeholder {

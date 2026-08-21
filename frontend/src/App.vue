@@ -20,6 +20,8 @@ import Sidebar from '@/components/shell/Sidebar.vue'
 import DropStashDialog from '@/components/stash/DropStashDialog.vue'
 import StashDialog from '@/components/stash/StashDialog.vue'
 import StashView from '@/components/stash/StashView.vue'
+import DeleteTagDialog from '@/components/tag/DeleteTagDialog.vue'
+import TagDialog from '@/components/tag/TagDialog.vue'
 import StatusBar from '@/components/shell/StatusBar.vue'
 import Toolbar from '@/components/shell/Toolbar.vue'
 import Welcome from '@/components/shell/Welcome.vue'
@@ -43,6 +45,7 @@ const {
   stash,
   applyStash,
   popStash,
+  pushTag,
 } = useRepo()
 const { state: prefsState, loadSignature } = usePrefs()
 const { loadAppearance } = useAppearance()
@@ -55,6 +58,8 @@ const {
   dropStashRequest,
   applyRequest,
   resetRequest,
+  tagRequest,
+  deleteTagRequest,
 } = dialogs
 
 /** The main area shows the history, the working tree, or one stash entry. */
@@ -126,6 +131,14 @@ async function confirmMerge(noFastForward: boolean) {
   await merge({ ref: req.source.short, noFastForward, message: '' })
 }
 
+// A tag names a commit, so checking one out can only detach HEAD.
+const checkoutTag = (t: git.Tag) => checkoutCommit(t.hash)
+
+function revealTag(t: git.Tag) {
+  mode.value = 'commit'
+  reveal.value = { hash: t.hash, nonce: ++nonce }
+}
+
 // A reset moves the branch HEAD is on, and says which one before it does.
 function askReset(commit: git.Commit) {
   resetRequest.value = { commit, branch: state.status?.head ?? '' }
@@ -188,6 +201,7 @@ onMounted(async () => {
       <Sidebar
         v-if="state.info"
         :refs="state.refs"
+        :tags="state.tags"
         :stashes="state.stashes"
         :change-count="changeCount"
         :mode="mode"
@@ -201,6 +215,11 @@ onMounted(async () => {
         @rename="dialogs.renameBranch"
         @remove="deleteRequest = { name: $event }"
         @add-remote="dialog.remote = true"
+        @reveal-tag="revealTag"
+        @checkout-tag="checkoutTag"
+        @branch-from-tag="(t) => dialogs.newBranch(t.name, t.name)"
+        @push-tag="(t) => pushTag(t.name, false)"
+        @delete-tag="deleteTagRequest = $event"
         @show-stash="showStash"
         @apply-stash="restoreStash($event, true)"
         @pop-stash="restoreStash($event, false)"
@@ -234,6 +253,7 @@ onMounted(async () => {
             :reveal="reveal"
             @branch="dialogs.newBranch"
             @checkout="checkoutCommit"
+            @tag="tagRequest = { commit: $event }"
             @revert="applyRequest = { kind: 'revert', commit: $event }"
             @cherry-pick="applyRequest = { kind: 'cherry-pick', commit: $event }"
             @reset="askReset"
@@ -273,6 +293,8 @@ onMounted(async () => {
     <DropStashDialog :stash="dropStashRequest" @close="dropStashRequest = null" />
     <ApplyCommitDialog :request="applyRequest" @close="applyRequest = null" />
     <ResetDialog :request="resetRequest" @close="resetRequest = null" />
+    <TagDialog :request="tagRequest" @close="tagRequest = null" />
+    <DeleteTagDialog :tag="deleteTagRequest" @close="deleteTagRequest = null" />
     <MergeDropMenu :drop="mergeDrop" @merge="confirmMerge" @close="mergeDrop = null" />
     <ConflictView :open="dialog.conflicts" @close="dialog.conflicts = false" />
   </div>

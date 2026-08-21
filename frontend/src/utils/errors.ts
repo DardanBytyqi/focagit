@@ -7,6 +7,7 @@ const REJECTED = 'push rejected'
 const STALE_INFO = 'remote has changed since the last fetch'
 const AUTH = 'authentication failed'
 const UNKNOWN_HOST = 'the server is not in known_hosts'
+const TAG_EXISTS = 'a tag with that name already exists'
 
 /** Strips the "git <args>: exit status N:" prefix git errors carry. */
 export function errorText(e: unknown): string {
@@ -48,6 +49,11 @@ export function isAuthFailure(e: unknown): boolean {
 /** True when ssh does not know the server, which only the user can settle. */
 export function isUnknownHost(e: unknown): boolean {
   return String(e).includes(UNKNOWN_HOST)
+}
+
+/** True when the tag name is taken, so creating it again has to be a move. */
+export function isTagExists(e: unknown): boolean {
+  return String(e).includes(TAG_EXISTS)
 }
 
 /** The host out of an SSH or HTTPS remote URL, for telling the user what to trust. */

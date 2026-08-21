@@ -9,9 +9,11 @@ import {
   ContextMenuTrigger,
 } from 'reka-ui'
 import type { git } from '@wails/go/models'
+import RefIcon from '@/components/shell/RefIcon.vue'
 
 const props = defineProps<{
   refs: git.Ref[]
+  tags: git.Tag[]
   stashes: git.Stash[]
   changeCount: number
   /** Stash is a mode too, so no nav item is highlighted while one is shown. */
@@ -30,6 +32,11 @@ const emit = defineEmits<{
   rename: [name: string]
   remove: [name: string]
   addRemote: []
+  revealTag: [t: git.Tag]
+  checkoutTag: [t: git.Tag]
+  branchFromTag: [t: git.Tag]
+  pushTag: [t: git.Tag]
+  deleteTag: [t: git.Tag]
   showStash: [s: git.Stash]
   applyStash: [s: git.Stash]
   popStash: [s: git.Stash]
@@ -104,7 +111,6 @@ function canCheckout(r: git.Ref) {
 const sections = computed(() => [
   { key: 'branch', title: 'Branches', refs: props.refs.filter((r) => r.kind === 'branch') },
   { key: 'remote', title: 'Remotes', refs: props.refs.filter((r) => r.kind === 'remote') },
-  { key: 'tag', title: 'Tags', refs: props.refs.filter((r) => r.kind === 'tag') },
 ])
 
 const collapsed = ref<Record<string, boolean>>({})
@@ -153,7 +159,10 @@ function toggle(key: string) {
           <ContextMenuTrigger as-child>
             <div
               class="ref"
-              :class="{ head: r.head, target: over === r.name, dragging: dragged?.name === r.name }"
+              :class="[
+                r.kind,
+                { head: r.head, target: over === r.name, dragging: dragged?.name === r.name },
+              ]"
               :draggable="canCheckout(r)"
               :title="dragged && canDrop(r) ? `Merge ${dragged.short} into ${r.short}` : ''"
               @click="emit('reveal', r)"
@@ -164,6 +173,7 @@ function toggle(key: string) {
               @dragleave="over === r.name && (over = '')"
               @drop="onDrop($event, r)"
             >
+              <RefIcon :kind="r.kind === 'remote' ? 'remote' : 'branch'" />
               <span class="ref-name">{{ r.short }}</span>
               <span v-if="r.upstream" class="upstream muted mono">{{ r.upstream }}</span>
             </div>
@@ -207,6 +217,51 @@ function toggle(key: string) {
         </ContextMenuRoot>
 
         <div v-if="!s.refs.length" class="empty muted">none</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header" @click="toggle('tag')">
+        <span class="chevron" :class="{ closed: collapsed.tag }">▾</span>
+        Tags
+        <span class="count muted">{{ tags.length }}</span>
+      </div>
+
+      <div v-show="!collapsed.tag">
+        <ContextMenuRoot v-for="t in tags" :key="t.name">
+          <ContextMenuTrigger as-child>
+            <div
+              class="ref tag"
+              :title="t.subject"
+              @click="emit('revealTag', t)"
+              @dblclick="emit('checkoutTag', t)"
+            >
+              <RefIcon kind="tag" />
+              <span class="ref-name">{{ t.name }}</span>
+            </div>
+          </ContextMenuTrigger>
+
+          <ContextMenuPortal>
+            <ContextMenuContent class="menu">
+              <ContextMenuItem class="menu-item" @select="emit('branchFromTag', t)">
+                New branch from {{ t.name }}…
+              </ContextMenuItem>
+              <!-- A tag names a commit, not a branch, so this can only detach HEAD. -->
+              <ContextMenuItem class="menu-item" @select="emit('checkoutTag', t)">
+                Checkout {{ t.name }}
+              </ContextMenuItem>
+              <ContextMenuSeparator class="menu-sep" />
+              <ContextMenuItem class="menu-item" @select="emit('pushTag', t)">
+                Push to origin
+              </ContextMenuItem>
+              <ContextMenuItem class="menu-item danger" @select="emit('deleteTag', t)">
+                Delete…
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenuPortal>
+        </ContextMenuRoot>
+
+        <div v-if="!tags.length" class="empty muted">none</div>
       </div>
     </div>
 
@@ -309,6 +364,15 @@ function toggle(key: string) {
   cursor: default;
 }
 
+/* The same colours the graph uses, so a kind looks the same everywhere. */
+.ref.branch .ref-icon {
+  color: var(--green);
+}
+
+.ref.tag .ref-icon {
+  color: var(--amber);
+}
+
 /* Pushed to the right edge, and only there when the pointer is. */
 .section-header .add {
   margin-left: auto;
@@ -341,7 +405,7 @@ function toggle(key: string) {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  padding: 2px 10px 2px 26px;
+  padding: 2px 10px 2px 22px;
   height: 22px;
   cursor: default;
   overflow: hidden;

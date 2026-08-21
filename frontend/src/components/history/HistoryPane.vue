@@ -18,6 +18,7 @@ defineProps<{
 const emit = defineEmits<{
   branch: [start: string, label: string]
   checkout: [hash: string]
+  tag: [commit: git.Commit]
   revert: [commit: git.Commit]
   cherryPick: [commit: git.Commit]
   reset: [commit: git.Commit]
@@ -42,6 +43,7 @@ const detailHeight = ref(340)
       @select="selected = $event"
       @branch="(start, label) => emit('branch', start, label)"
       @checkout="emit('checkout', $event)"
+      @tag="emit('tag', $event)"
       @revert="emit('revert', $event)"
       @cherry-pick="emit('cherryPick', $event)"
       @reset="emit('reset', $event)"

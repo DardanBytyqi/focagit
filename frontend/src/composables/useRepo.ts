@@ -12,7 +12,9 @@ import {
   ConflictText,
   Conflicts,
   CreateBranch,
+  CreateTag,
   DeleteBranch,
+  DeleteTag,
   DropStash,
   Fetch,
   FinishOperation,
@@ -27,6 +29,7 @@ import {
   PopStash,
   Pull,
   Push,
+  PushTag,
   Refs,
   RemoveRemote,
   RenameBranch,
@@ -39,6 +42,7 @@ import {
   Stash,
   Stashes,
   Status,
+  Tags,
 } from '@wails/go/main/App'
 import { EventsOn } from '@wails/runtime/runtime'
 import { errorText } from '@/utils/errors'
@@ -53,6 +57,7 @@ interface State {
   gen: number
   loading: boolean
   refs: git.Ref[]
+  tags: git.Tag[]
   stashes: git.Stash[]
   status: git.Status | null
   error: string
@@ -74,6 +79,7 @@ const state = reactive<State>({
   gen: 0,
   loading: false,
   refs: [],
+  tags: [],
   stashes: [],
   status: null,
   error: '',
@@ -133,6 +139,7 @@ function reset() {
   state.count = 0
   state.width = 1
   state.refs = []
+  state.tags = []
   state.stashes = []
   state.status = null
   state.conflicts = []
@@ -207,13 +214,15 @@ const cancelClone = () => CancelClone()
 async function refresh() {
   if (!state.info) return
   try {
-    const [refs, stashes, status, history] = await Promise.all([
+    const [refs, tags, stashes, status, history] = await Promise.all([
       Refs(state.info.id),
+      Tags(state.info.id),
       Stashes(state.info.id),
       Status(state.info.id),
       GetHistory(state.info.id),
     ])
     state.refs = refs
+    state.tags = tags
     state.stashes = stashes
     state.status = status
     state.gen = history.gen
@@ -383,6 +392,25 @@ const applyStash = (ref: string, index: boolean) => act((id) => ApplyStash(id, r
 const popStash = (ref: string, index: boolean) => act((id) => PopStash(id, ref, index))
 const dropStash = (ref: string) => act((id) => DropStash(id, ref))
 
+const createTag = (opts: git.TagOptions) => act((id) => CreateTag(id, opts))
+const deleteTag = (name: string) => act((id) => DeleteTag(id, name))
+
+/** Pushing a tag reaches the network, so it reports like every other push. */
+async function pushTag(name: string, remove: boolean): Promise<git.PushResult[] | null> {
+  if (!state.info) return null
+  state.error = ''
+  return working(async () => {
+    try {
+      const res = await PushTag(state.info!.id, '', name, remove)
+      await refresh()
+      return res
+    } catch (e) {
+      state.error = errorText(e)
+      return null
+    }
+  })
+}
+
 const checkout = (ref: git.Ref) => act((id) => Checkout(id, ref))
 const checkoutCommit = (hash: string) => act((id) => CheckoutCommit(id, hash))
 const createBranch = (opts: git.CreateBranchOptions) => act((id) => CreateBranch(id, opts))
@@ -404,6 +432,9 @@ export function useRepo() {
     createBranch,
     deleteBranch,
     renameBranch,
+    createTag,
+    deleteTag,
+    pushTag,
     stash,
     applyStash,
     popStash,

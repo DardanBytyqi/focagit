@@ -34,6 +34,11 @@ export interface ApplyRequest {
   commit: git.Commit
 }
 
+/** An open dialog for tagging a commit. */
+export interface TagRequest {
+  commit: git.Commit
+}
+
 /** An open confirmation for moving the current branch onto a commit. */
 export interface ResetRequest {
   commit: git.Commit
