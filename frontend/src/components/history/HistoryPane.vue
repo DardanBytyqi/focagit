@@ -12,6 +12,7 @@ defineProps<{
   gen: number
   refsByHash: Map<string, git.Ref[]>
   head: string
+  reveal: { hash: string; nonce: number } | null
 }>()
 
 const emit = defineEmits<{
@@ -37,6 +38,7 @@ const detailHeight = ref(340)
       :gen="gen"
       :refs-by-hash="refsByHash"
       :head="head"
+      :reveal="reveal"
       @select="selected = $event"
       @branch="(start, label) => emit('branch', start, label)"
       @checkout="emit('checkout', $event)"

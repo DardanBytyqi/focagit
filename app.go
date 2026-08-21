@@ -243,6 +243,16 @@ func (a *App) CommitRange(id string, offset, count int) ([]session.Entry, error)
 	return repo.Range(offset, count), nil
 }
 
+// CommitIndex is the row a commit sits on, so the list can scroll to it, or -1
+// when the history does not hold it.
+func (a *App) CommitIndex(id, hash string) (int, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return -1, err
+	}
+	return repo.IndexOf(hash), nil
+}
+
 // Refs lists branches, remotes and tags for the sidebar.
 func (a *App) Refs(id string) ([]git.Ref, error) {
 	repo, err := a.session.Get(id)

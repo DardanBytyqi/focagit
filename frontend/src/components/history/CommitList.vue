@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -9,7 +9,7 @@ import {
   ContextMenuTrigger,
 } from 'reka-ui'
 import type { git, session } from '@wails/go/models'
-import { CommitRange } from '@wails/go/main/App'
+import { CommitIndex, CommitRange } from '@wails/go/main/App'
 import { formatDate } from '@/utils/format'
 
 const props = defineProps<{
@@ -21,6 +21,8 @@ const props = defineProps<{
   refsByHash: Map<string, git.Ref[]>
   /** The branch a reset would move; empty when HEAD is detached. */
   head: string
+  /** A commit to scroll to and select; the nonce lets the same one be asked twice. */
+  reveal: { hash: string; nonce: number } | null
 }>()
 
 const emit = defineEmits<{
@@ -116,6 +118,37 @@ function select(e: session.Entry) {
   selected.value = e.commit.hash
   emit('select', e.commit)
 }
+
+/** Scrolls the row into view, centred, unless it is already on screen. */
+function scrollTo(i: number) {
+  const vp = viewport.value
+  if (!vp) return
+
+  const top = i * ROW
+  if (top >= vp.scrollTop && top + ROW <= vp.scrollTop + vp.clientHeight) return
+  vp.scrollTop = Math.max(0, top - vp.clientHeight / 2 + ROW / 2)
+  scrollTop.value = vp.scrollTop
+}
+
+// Clicking a ref lands on its commit, wherever in the history that is.
+watch(
+  () => props.reveal,
+  async (r) => {
+    if (!r) return
+    // The pane may have just been mounted, so the viewport is not measured yet.
+    await nextTick()
+
+    const i = await CommitIndex(props.repoId, r.hash)
+    if (i < 0) return
+
+    scrollTo(i)
+    await fetchPage(Math.floor(i / PAGE))
+    const entry = entryAt(i)
+    if (entry) select(entry)
+    // The page is still on its way; the row highlights as soon as it lands.
+    else selected.value = r.hash
+  },
+)
 
 // ---- graph geometry -------------------------------------------------------
 

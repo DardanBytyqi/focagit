@@ -28,6 +28,8 @@ type Repo struct {
 
 	mu      sync.RWMutex
 	entries []Entry
+	// index is the row each commit sits on, so the list can jump to one.
+	index   map[string]int
 	width   int
 	loading bool
 	loadErr error
@@ -101,6 +103,7 @@ func (r *Repo) Load(ctx context.Context, onProgress func(gen, loaded, width int,
 
 	r.mu.Lock()
 	r.entries = nil
+	r.index = map[string]int{}
 	r.width = 0
 	r.loading = true
 	r.loadErr = nil
@@ -121,6 +124,9 @@ func (r *Repo) Load(ctx context.Context, onProgress func(gen, loaded, width int,
 		if r.gen != gen {
 			r.mu.Unlock()
 			return
+		}
+		for i, e := range batch {
+			r.index[e.Commit.Hash] = len(r.entries) + i
 		}
 		r.entries = append(r.entries, batch...)
 		r.width = builder.Width()
@@ -198,6 +204,16 @@ func (r *Repo) Range(offset, count int) []Entry {
 	out := make([]Entry, end-offset)
 	copy(out, r.entries[offset:end])
 	return out
+}
+
+// IndexOf is the row a commit sits on, or -1 when the history does not hold it.
+func (r *Repo) IndexOf(hash string) int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if i, ok := r.index[hash]; ok {
+		return i
+	}
+	return -1
 }
 
 // Count is how many commits are cached right now.

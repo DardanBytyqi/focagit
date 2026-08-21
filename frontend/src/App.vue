@@ -63,6 +63,16 @@ const changeCount = computed(() => state.status?.files?.length ?? 0)
 
 const shownStash = ref<git.Stash | null>(null)
 
+/** The commit the list should jump to; the nonce lets the same ref be clicked twice. */
+const reveal = ref<{ hash: string; nonce: number } | null>(null)
+let nonce = 0
+
+// Clicking a ref shows where it points; double-clicking it checks it out.
+function revealRef(r: git.Ref) {
+  mode.value = 'commit'
+  reveal.value = { hash: r.hash, nonce: ++nonce }
+}
+
 // The plain button takes everything, untracked included; the arrow is for the rest.
 const doStash = () => stash({ message: '', untracked: true, keepIndex: false, paths: [] })
 
@@ -183,6 +193,7 @@ onMounted(async () => {
         :mode="mode"
         :head="state.status?.head ?? ''"
         @mode="mode = $event"
+        @reveal="revealRef"
         @checkout="checkout"
         @merge="doMerge"
         @merge-drop="(s, t, x, y) => (mergeDrop = { source: s, target: t, x, y })"
@@ -220,6 +231,7 @@ onMounted(async () => {
             :gen="state.gen"
             :refs-by-hash="refsByHash"
             :head="state.status?.head ?? ''"
+            :reveal="reveal"
             @branch="dialogs.newBranch"
             @checkout="checkoutCommit"
             @revert="applyRequest = { kind: 'revert', commit: $event }"

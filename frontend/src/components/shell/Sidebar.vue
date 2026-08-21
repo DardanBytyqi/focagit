@@ -22,6 +22,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   mode: [m: 'commit' | 'changes']
+  reveal: [r: git.Ref]
   checkout: [r: git.Ref]
   merge: [r: git.Ref]
   mergeDrop: [source: git.Ref, target: git.Ref, x: number, y: number]
@@ -155,6 +156,7 @@ function toggle(key: string) {
               :class="{ head: r.head, target: over === r.name, dragging: dragged?.name === r.name }"
               :draggable="canCheckout(r)"
               :title="dragged && canDrop(r) ? `Merge ${dragged.short} into ${r.short}` : ''"
+              @click="emit('reveal', r)"
               @dblclick="canCheckout(r) && emit('checkout', r)"
               @dragstart="onDragStart($event, r)"
               @dragend="endDrag"
