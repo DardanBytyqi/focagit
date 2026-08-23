@@ -1,7 +1,10 @@
-# Fedora 44 ships webkit2gtk 4.1 only, while Wails v2 defaults to 4.0.
-# Every wails command therefore needs this build tag.
-WAILS_TAGS := webkit2_41
-WAILS      := $(shell go env GOPATH)/bin/wails
+# Fedora 44 ships webkit2gtk 4.1 only, while Wails v2 defaults to 4.0, so on
+# Linux every wails command needs this build tag. macOS links the system WebKit
+# and wants no tag at all, so the flag stays empty there.
+ifeq ($(shell uname -s),Linux)
+WAILS_FLAGS := -tags webkit2_41
+endif
+WAILS := $(shell go env GOPATH)/bin/wails
 
 .PHONY: test cli dev build lint fmt tidy
 
@@ -15,11 +18,11 @@ cli:
 
 ## dev: live-reloading Wails app (from stage 2 on)
 dev:
-	$(WAILS) dev -tags $(WAILS_TAGS)
+	$(WAILS) dev $(WAILS_FLAGS)
 
 ## build: production desktop binary (from stage 2 on)
 build:
-	$(WAILS) build -tags $(WAILS_TAGS)
+	$(WAILS) build $(WAILS_FLAGS)
 
 lint:
 	go vet ./...
