@@ -15,7 +15,20 @@ func (r *Repo) Status(ctx context.Context) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
-	return parseStatus(out)
+	st, err := parseStatus(out)
+	if err != nil {
+		return Status{}, err
+	}
+	// Only without an upstream: otherwise ahead already says it, for free.
+	if st.Upstream == "" && !st.Detached {
+		st.Unpushed = r.UnpushedCount(ctx)
+	}
+	// Off disk rather than asking git: status is refreshed constantly.
+	if op, hash := r.Operation(); op != OpNone {
+		st.Operation = op
+		st.OperationFrom = r.operationFrom(ctx, op, hash)
+	}
+	return st, nil
 }
 
 func parseStatus(data []byte) (Status, error) {

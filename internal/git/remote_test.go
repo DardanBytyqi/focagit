@@ -333,6 +333,41 @@ func hasRemoteRef(t *testing.T, repo *Repo, name string) bool {
 	return false
 }
 
+func TestClassifyRemoteUnreachable(t *testing.T) {
+	tests := []struct {
+		name   string
+		stderr string
+		want   string
+	}{
+		{
+			"unknown host",
+			"Cloning into 'proj'...\nfatal: unable to access 'https://nohost.example/x/y/': Could not resolve host: nohost.example",
+			"cannot reach the server: unable to access 'https://nohost.example/x/y/': Could not resolve host: nohost.example",
+		},
+		{
+			"refused",
+			"fatal: unable to access 'http://localhost:1/x/': Failed to connect: Connection refused",
+			"cannot reach the server: unable to access 'http://localhost:1/x/': Failed to connect: Connection refused",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := classifyRemote(&CommandError{
+				Args:   []string{"clone", "--progress"},
+				Stderr: tt.stderr,
+				Err:    errors.New("exit status 128"),
+			})
+			if !errors.Is(err, ErrUnreachable) {
+				t.Fatalf("got %v, want ErrUnreachable", err)
+			}
+			// The progress chatter must not reach the user.
+			if err.Error() != tt.want {
+				t.Errorf("message = %q, want %q", err.Error(), tt.want)
+			}
+		})
+	}
+}
+
 func TestFetchWithoutRemote(t *testing.T) {
 	repo := branchRepo(t)
 

@@ -21,10 +21,35 @@ export interface Selected {
 
 /** An open branch dialog: either creating one, or renaming an existing one. */
 export type BranchRequest =
-  | { kind: 'create'; start: string; startLabel: string }
-  | { kind: 'rename'; from: string }
+  { kind: 'create'; start: string; startLabel: string } | { kind: 'rename'; from: string }
 
 /** An open confirmation for deleting a branch. */
 export interface DeleteRequest {
   name: string
+}
+
+/** An open confirmation for replaying a commit, one way round or the other. */
+export interface ApplyRequest {
+  kind: 'revert' | 'cherry-pick'
+  commit: git.Commit
+}
+
+/** An open dialog for tagging a commit. */
+export interface TagRequest {
+  commit: git.Commit
+}
+
+/** An open confirmation for moving the current branch onto a commit. */
+export interface ResetRequest {
+  commit: git.Commit
+  /** The branch that would move; empty when HEAD is detached. */
+  branch: string
+}
+
+/** A branch dropped on another branch, and where the pointer let go. */
+export interface MergeDrop {
+  source: git.Ref
+  target: git.Ref
+  x: number
+  y: number
 }

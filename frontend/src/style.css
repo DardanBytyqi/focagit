@@ -1,5 +1,4 @@
-/* Design tokens. Everything visual references these, so the light theme in
-   stage 7 is a matter of redefining the block rather than hunting colours. */
+/* Design tokens. A theme redefines this block, never hunts colours. */
 :root {
   --bg: #1e1f22;
   --bg-raised: #26282c;
@@ -19,8 +18,7 @@
   --amber: #d9a441;
   --purple: #b07cd6;
 
-  /* Graph lane colours. There are eight because internal/graph uses a palette
-     of eight; the two only have to agree on the count, not on the values. */
+  /* Graph lanes: eight, because internal/graph uses eight. */
   --lane-0: #4a8cf7;
   --lane-1: #6cc26c;
   --lane-2: #d9a441;
@@ -30,7 +28,13 @@
   --lane-6: #d67ca8;
   --lane-7: #9aa0a6;
 
-  --row-height: 24px;
+  /* The two sides of a conflict. Not green and red: those mean added and removed. */
+  --mine: #46b8b0;
+  --theirs: #b07cd6;
+
+  --shadow: rgb(0 0 0 / 0.45);
+  --scrim: rgb(0 0 0 / 0.5);
+
   --sidebar-width: 240px;
   --toolbar-height: 40px;
   --statusbar-height: 24px;
@@ -50,12 +54,12 @@
 /* The light theme. Only colours change: sizes are the same choice either way. */
 :root[data-theme="light"] {
   --bg: #ffffff;
-  --bg-raised: #f6f7f9;
-  --bg-toolbar: #eef0f3;
-  --bg-hover: #e9ebef;
-  --bg-selected: #cfe0f8;
-  --border: #dcdfe4;
-  --border-strong: #bcc1c9;
+  --bg-raised: #eef1f5;
+  --bg-toolbar: #e2e7ee;
+  --bg-hover: #d8dfe8;
+  --bg-selected: #c4d8f6;
+  --border: #c1c9d3;
+  --border-strong: #98a2af;
 
   --text: #1f2328;
   --text-muted: #5c6570;
@@ -76,19 +80,12 @@
   --lane-5: #0f7f78;
   --lane-6: #b1417c;
   --lane-7: #5d666f;
-}
 
-/* Density and font size are set on the root by the appearance settings. */
-:root[data-density="compact"] {
-  --row-height: 20px;
-  --toolbar-height: 34px;
-  --statusbar-height: 21px;
-}
+  --mine: #0f7f78;
+  --theirs: #7743c9;
 
-:root[data-density="roomy"] {
-  --row-height: 30px;
-  --toolbar-height: 46px;
-  --statusbar-height: 28px;
+  --shadow: rgb(0 0 0 / 0.16);
+  --scrim: rgb(0 0 0 / 0.35);
 }
 
 * {
@@ -160,7 +157,7 @@ button:disabled {
   background: var(--bg-raised);
   border: 1px solid var(--border-strong);
   border-radius: 5px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+  box-shadow: 0 8px 24px var(--shadow);
   z-index: var(--z-menu);
 }
 
@@ -182,7 +179,7 @@ button:disabled {
 
 .menu-item.danger[data-highlighted] {
   background: var(--red);
-  color: #1e1f22;
+  color: var(--bg);
 }
 
 .menu-sep {
@@ -198,4 +195,37 @@ button:disabled {
 
 .muted {
   color: var(--text-muted);
+}
+
+/* The label under the pointer while dragging. Lives on the body, so unscoped. */
+.drag-chip {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+  padding: 3px 9px;
+  background: var(--bg-selected);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text);
+  font: var(--fs) var(--font);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* A count pill. Floored width, so one digit and two are the same object. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  /* Digits of one width: the pill stops twitching as the count changes. */
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }

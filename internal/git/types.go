@@ -82,13 +82,19 @@ type FileStatus struct {
 
 // Status is the full working tree state plus the branch header.
 type Status struct {
-	Head     string       `json:"head"`     // branch name, empty when detached
-	Oid      string       `json:"oid"`      // commit HEAD points at
-	Upstream string       `json:"upstream"` // tracking branch, if any
-	Ahead    int          `json:"ahead"`
-	Behind   int          `json:"behind"`
-	Detached bool         `json:"detached"`
-	Files    []FileStatus `json:"files"`
+	Head     string `json:"head"`     // branch name, empty when detached
+	Oid      string `json:"oid"`      // commit HEAD points at
+	Upstream string `json:"upstream"` // tracking branch, if any
+	Ahead    int    `json:"ahead"`
+	// Unpushed counts commits on no remote, for a branch with no upstream.
+	Unpushed int  `json:"unpushed"`
+	Behind   int  `json:"behind"`
+	Detached bool `json:"detached"`
+	// Operation is the multi-step operation left open, empty when there is none.
+	Operation Operation `json:"operation"`
+	// OperationFrom names what that operation is applying.
+	OperationFrom string       `json:"operationFrom"`
+	Files         []FileStatus `json:"files"`
 }
 
 // IsClean reports whether there is nothing to commit and nothing untracked.

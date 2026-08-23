@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -21,6 +23,10 @@ type App struct {
 	ctx     context.Context
 	session *session.Session
 	prefs   *prefs.Store
+
+	// mu guards cloneCancel, which the clone and its cancel button share.
+	mu          sync.Mutex
+	cloneCancel context.CancelFunc
 }
 
 func NewApp() *App {
@@ -61,6 +67,7 @@ func (a *App) OpenRepo(path string) (session.Info, error) {
 	}
 
 	a.reload(repo)
+	a.startWatch(repo)
 	if a.prefs != nil {
 		if err := a.prefs.Remember(repo.Info.Path, repo.Info.Name); err != nil {
 			slog.Warn("could not save the recent list", slog.String("err", err.Error()))
@@ -81,6 +88,29 @@ func (a *App) reload(repo *session.Repo) {
 			runtime.EventsEmit(a.ctx, "repo:progress", Progress{
 				ID: repo.Info.ID, Gen: repo.Gen(), Done: true, Error: err.Error(),
 			})
+		}
+	}()
+}
+
+// Changed says the repository moved under us, so the frontend re-reads what it shows.
+type Changed struct {
+	ID string `json:"id"`
+}
+
+// startWatch reports later changes on disk; listing the ignored folders can be slow.
+func (a *App) startWatch(repo *session.Repo) {
+	go func() {
+		err := repo.Watch(a.ctx, func(refs bool) {
+			// A moved branch changes the graph, which only a fresh walk can rebuild.
+			if refs {
+				a.reload(repo)
+				return
+			}
+			runtime.EventsEmit(a.ctx, "repo:changed", Changed{ID: repo.Info.ID})
+		})
+		if err != nil {
+			slog.Warn("changes made outside focagit will go unnoticed",
+				slog.String("repo", repo.Info.Name), slog.String("err", err.Error()))
 		}
 	}()
 }
@@ -125,6 +155,63 @@ func (a *App) SelectRepo() (string, error) {
 	})
 }
 
+// SelectFolder is the same picker, for choosing where a clone should land.
+func (a *App) SelectFolder(title, start string) (string, error) {
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:            title,
+		DefaultDirectory: start,
+	})
+}
+
+// CloneParent is where the last repository was opened from, or the home folder.
+func (a *App) CloneParent() string {
+	if a.prefs != nil {
+		if recents := a.prefs.Recents(); len(recents) > 0 {
+			return filepath.Dir(recents[0].Path)
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return home
+}
+
+// PreviewClone says where these options would put the repository.
+func (a *App) PreviewClone(opts git.CloneOptions) git.ClonePreview {
+	return git.PreviewClone(opts)
+}
+
+// CloneRepo copies a remote repository to disk and opens it.
+func (a *App) CloneRepo(opts git.CloneOptions) (session.Info, error) {
+	ctx, cancel := context.WithCancel(a.ctx)
+	a.mu.Lock()
+	a.cloneCancel = cancel
+	a.mu.Unlock()
+	defer func() {
+		a.mu.Lock()
+		a.cloneCancel = nil
+		a.mu.Unlock()
+		cancel()
+	}()
+
+	path, err := git.Clone(ctx, opts, a.report("", "clone"))
+	runtime.EventsEmit(a.ctx, "repo:network", Network{Op: "clone", Done: true, Error: errText(err)})
+	if err != nil {
+		return session.Info{}, err
+	}
+	return a.OpenRepo(path)
+}
+
+// CancelClone stops a clone in progress; the half-copied folder is removed.
+func (a *App) CancelClone() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.cloneCancel != nil {
+		a.cloneCancel()
+	}
+}
+
 // CloseRepo cancels any in-flight load and drops the cache.
 func (a *App) CloseRepo(id string) { a.session.Close(id) }
 
@@ -154,6 +241,16 @@ func (a *App) CommitRange(id string, offset, count int) ([]session.Entry, error)
 		return nil, err
 	}
 	return repo.Range(offset, count), nil
+}
+
+// CommitIndex is the row a commit sits on, so the list can scroll to it, or -1
+// when the history does not hold it.
+func (a *App) CommitIndex(id, hash string) (int, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return -1, err
+	}
+	return repo.IndexOf(hash), nil
 }
 
 // Refs lists branches, remotes and tags for the sidebar.
@@ -410,6 +507,74 @@ func (a *App) RenameBranch(id, from, to string) error {
 	return repo.RenameBranch(a.ctx, from, to)
 }
 
+// --- stash --------------------------------------------------------------------
+
+// Stashes lists the stack for the sidebar.
+func (a *App) Stashes(id string) ([]git.Stash, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	return repo.Stashes(a.ctx)
+}
+
+// Stash puts the working tree away; the entry is a commit, so the graph changes.
+func (a *App) Stash(id string, opts git.StashOptions) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.Stash(a.ctx, opts); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// ApplyStash restores an entry and leaves it on the stack.
+func (a *App) ApplyStash(id, ref string, index bool) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	return repo.ApplyStash(a.ctx, ref, index)
+}
+
+// PopStash restores an entry and drops it, which removes its commit from the graph.
+func (a *App) PopStash(id, ref string, index bool) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.PopStash(a.ctx, ref, index); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// DropStash removes an entry without restoring it.
+func (a *App) DropStash(id, ref string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.DropStash(a.ctx, ref); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// StashFiles lists what an entry would change, for the detail pane.
+func (a *App) StashFiles(id, ref string) ([]git.FileChange, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	return repo.StashFiles(a.ctx, ref)
+}
+
 // --- remotes ------------------------------------------------------------------
 
 // Network is what a fetch or a push is doing right now, pushed as it happens.
@@ -537,6 +702,236 @@ func (a *App) SaveAppearance(look prefs.Appearance) (prefs.Appearance, error) {
 		return prefs.DefaultAppearance(), err
 	}
 	return a.prefs.Appearance(), nil
+}
+
+// --- merge --------------------------------------------------------------------
+
+// PreviewMerge answers what a merge would do, so the UI offers only real choices.
+func (a *App) PreviewMerge(id, source, target string) (git.MergePreview, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.MergePreview{}, err
+	}
+	return repo.PreviewMerge(a.ctx, source, target)
+}
+
+// Merge joins a branch into the current one and reloads what changed.
+func (a *App) Merge(id string, opts git.MergeOptions) (git.MergeResult, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.MergeResult{}, err
+	}
+	res, err := repo.Merge(a.ctx, opts)
+	if err != nil {
+		return git.MergeResult{}, err
+	}
+	// A conflict changes the working tree too, so the views reload either way.
+	a.reload(repo)
+	return res, nil
+}
+
+// Pull fetches and then merges the upstream, reporting progress like a fetch does.
+func (a *App) Pull(id string, opts git.PullOptions) (git.MergeResult, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.MergeResult{}, err
+	}
+
+	res, err := repo.Pull(a.ctx, opts, a.report(id, "pull"))
+	runtime.EventsEmit(a.ctx, "repo:network", Network{ID: id, Op: "pull", Done: true, Error: errText(err)})
+	if err != nil {
+		return git.MergeResult{}, err
+	}
+	a.reload(repo)
+	return res, nil
+}
+
+// AbortOperation throws away the merge, revert or cherry-pick left half-finished.
+func (a *App) AbortOperation(id string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.AbortOperation(a.ctx); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// FinishOperation records the commit that ends it, once nothing is conflicted.
+func (a *App) FinishOperation(id, message string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.FinishOperation(a.ctx, message); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// Conflicts lists the unmerged files and which side still has each one.
+func (a *App) Conflicts(id string) ([]git.Conflict, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	list, err := repo.Conflicts(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		list = []git.Conflict{}
+	}
+	return list, nil
+}
+
+// ConflictText reads a conflicted file cut into the blocks that disagree.
+func (a *App) ConflictText(id, path string) (git.ConflictText, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.ConflictText{}, err
+	}
+	return repo.ConflictText(a.ctx, path)
+}
+
+// ResolveLines writes one choice per block and stages the result. The picks are
+// plain strings because Wails cannot carry a named string type across the bridge.
+func (a *App) ResolveLines(id, path string, picks []string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	choices := make([]git.ConflictPick, len(picks))
+	for i, p := range picks {
+		choices[i] = git.ConflictPick(p)
+	}
+	if err := repo.ResolveLines(a.ctx, path, choices); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// ResolveConflict settles one file by keeping one side whole. The side is a
+// plain string because Wails cannot carry a named string type across the bridge.
+func (a *App) ResolveConflict(id, path, side string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.Resolve(a.ctx, path, git.ConflictSide(side)); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// --- tags ----------------------------------------------------------------------
+
+// Tags lists refs/tags for the sidebar, highest version first.
+func (a *App) Tags(id string) ([]git.Tag, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	return repo.Tags(a.ctx)
+}
+
+// CreateTag names a commit; the graph gains a label, so the history is re-read.
+func (a *App) CreateTag(id string, opts git.TagOptions) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.CreateTag(a.ctx, opts); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// DeleteTag removes it here; a copy already pushed stays on the remote.
+func (a *App) DeleteTag(id, name string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.DeleteTag(a.ctx, name); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// PushTag sends one tag to a remote, or removes the remote's copy of it.
+func (a *App) PushTag(id, remote, name string, remove bool) ([]git.PushResult, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := repo.PushTag(a.ctx, remote, name, remove, a.report(id, "push"))
+	runtime.EventsEmit(a.ctx, "repo:network", Network{ID: id, Op: "push", Done: true, Error: errText(err)})
+	if res == nil {
+		res = []git.PushResult{}
+	}
+	return res, err
+}
+
+// --- revert, cherry-pick and reset ---------------------------------------------
+
+// Revert records the opposite of a commit on top of HEAD.
+func (a *App) Revert(id string, opts git.ApplyOptions) (git.ApplyResult, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.ApplyResult{}, err
+	}
+	res, err := repo.Revert(a.ctx, opts)
+	if err != nil {
+		return git.ApplyResult{}, err
+	}
+	a.reload(repo)
+	return res, nil
+}
+
+// CherryPick replays a commit's change on top of HEAD.
+func (a *App) CherryPick(id string, opts git.ApplyOptions) (git.ApplyResult, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.ApplyResult{}, err
+	}
+	res, err := repo.CherryPick(a.ctx, opts)
+	if err != nil {
+		return git.ApplyResult{}, err
+	}
+	a.reload(repo)
+	return res, nil
+}
+
+// PreviewReset says what the branch would give up, for the window that has to warn.
+func (a *App) PreviewReset(id, rev string) (git.ResetPreview, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.ResetPreview{}, err
+	}
+	return repo.PreviewReset(a.ctx, rev)
+}
+
+// Reset moves the branch onto another commit. The mode is a plain string because
+// Wails cannot carry a named string type across the bridge.
+func (a *App) Reset(id, rev, mode string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.Reset(a.ctx, rev, git.ResetMode(mode)); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
 }
 
 // --- ssh keys -----------------------------------------------------------------

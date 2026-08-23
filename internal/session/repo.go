@@ -9,6 +9,7 @@ import (
 	"github.com/dardanbytyqi/focagit/internal/git"
 	"github.com/dardanbytyqi/focagit/internal/graph"
 	"github.com/dardanbytyqi/focagit/internal/patch"
+	"github.com/dardanbytyqi/focagit/internal/watch"
 )
 
 // progressBatch is how many commits accumulate before the loader reports progress.
@@ -27,12 +28,61 @@ type Repo struct {
 
 	mu      sync.RWMutex
 	entries []Entry
+	// index is the row each commit sits on, so the list can jump to one.
+	index   map[string]int
 	width   int
 	loading bool
 	loadErr error
 	cancel  context.CancelFunc
 	// gen counts reloads, so the frontend knows its cached pages are stale.
 	gen int
+	// watcher is nil until someone asks to be told about changes.
+	watcher *watch.Watcher
+}
+
+// Watch calls onChange whenever the working tree or the refs move on disk.
+func (r *Repo) Watch(ctx context.Context, onChange func(refs bool)) error {
+	r.mu.Lock()
+	running := r.watcher != nil
+	r.mu.Unlock()
+	if running {
+		return nil
+	}
+
+	// Ignored folders are where the build output lives: thousands of handles, nothing to show.
+	ignored, err := r.git.IgnoredDirs(ctx)
+	if err != nil {
+		slog.Warn("could not list the ignored folders", slog.String("err", err.Error()))
+	}
+
+	w, err := watch.Start(watch.Config{
+		Root:   r.git.Root(),
+		GitDir: r.git.GitDir(),
+		Skip:   ignored,
+		// A folder born later is asked about once: node_modules must not be watched.
+		Ignored:  func(dir string) bool { return r.git.Ignores(ctx, dir) },
+		OnChange: onChange,
+	})
+	if err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	r.watcher = w
+	r.mu.Unlock()
+	return nil
+}
+
+// stopWatch releases the inotify handles the watcher holds.
+func (r *Repo) stopWatch() {
+	r.mu.Lock()
+	w := r.watcher
+	r.watcher = nil
+	r.mu.Unlock()
+
+	if w != nil {
+		_ = w.Close()
+	}
 }
 
 // Gen is the current history generation; it changes on every reload.
@@ -53,6 +103,7 @@ func (r *Repo) Load(ctx context.Context, onProgress func(gen, loaded, width int,
 
 	r.mu.Lock()
 	r.entries = nil
+	r.index = map[string]int{}
 	r.width = 0
 	r.loading = true
 	r.loadErr = nil
@@ -69,6 +120,14 @@ func (r *Repo) Load(ctx context.Context, onProgress func(gen, loaded, width int,
 	var batch []Entry
 	flush := func(done bool) {
 		r.mu.Lock()
+		// A newer walk owns the cache now; these entries belong to a history it replaced.
+		if r.gen != gen {
+			r.mu.Unlock()
+			return
+		}
+		for i, e := range batch {
+			r.index[e.Commit.Hash] = len(r.entries) + i
+		}
 		r.entries = append(r.entries, batch...)
 		r.width = builder.Width()
 		total, width := len(r.entries), r.width
@@ -92,8 +151,11 @@ func (r *Repo) Load(ctx context.Context, onProgress func(gen, loaded, width int,
 	})
 
 	r.mu.Lock()
-	r.loading = false
-	r.loadErr = err
+	// Same reason: a cancelled walk must not report the newer one as finished.
+	if r.gen == gen {
+		r.loading = false
+		r.loadErr = err
+	}
 	r.mu.Unlock()
 
 	// Flush whatever is left even on failure: a partial history is more useful than none.
@@ -142,6 +204,16 @@ func (r *Repo) Range(offset, count int) []Entry {
 	out := make([]Entry, end-offset)
 	copy(out, r.entries[offset:end])
 	return out
+}
+
+// IndexOf is the row a commit sits on, or -1 when the history does not hold it.
+func (r *Repo) IndexOf(hash string) int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if i, ok := r.index[hash]; ok {
+		return i
+	}
+	return -1
 }
 
 // Count is how many commits are cached right now.
@@ -232,6 +304,50 @@ func (r *Repo) Commit(ctx context.Context, opts git.CommitOptions) error {
 	return r.git.Commit(ctx, opts)
 }
 
+// --- stash -------------------------------------------------------------------
+
+func (r *Repo) Stashes(ctx context.Context) ([]git.Stash, error) {
+	return r.git.Stashes(ctx)
+}
+
+func (r *Repo) Stash(ctx context.Context, opts git.StashOptions) error {
+	return r.git.Stash(ctx, opts)
+}
+
+func (r *Repo) ApplyStash(ctx context.Context, ref string, index bool) error {
+	return r.git.ApplyStash(ctx, ref, index)
+}
+
+func (r *Repo) PopStash(ctx context.Context, ref string, index bool) error {
+	return r.git.PopStash(ctx, ref, index)
+}
+
+func (r *Repo) DropStash(ctx context.Context, ref string) error {
+	return r.git.DropStash(ctx, ref)
+}
+
+func (r *Repo) StashFiles(ctx context.Context, ref string) ([]git.FileChange, error) {
+	return r.git.StashFiles(ctx, ref)
+}
+
+// --- tags --------------------------------------------------------------------
+
+func (r *Repo) Tags(ctx context.Context) ([]git.Tag, error) {
+	return r.git.Tags(ctx)
+}
+
+func (r *Repo) CreateTag(ctx context.Context, opts git.TagOptions) error {
+	return r.git.CreateTag(ctx, opts)
+}
+
+func (r *Repo) DeleteTag(ctx context.Context, name string) error {
+	return r.git.DeleteTag(ctx, name)
+}
+
+func (r *Repo) PushTag(ctx context.Context, remote, name string, remove bool, onProgress func(string)) ([]git.PushResult, error) {
+	return r.git.PushTag(ctx, remote, name, remove, onProgress)
+}
+
 // --- branches ---------------------------------------------------------------
 
 func (r *Repo) Checkout(ctx context.Context, branch string) error {
@@ -276,4 +392,54 @@ func (r *Repo) Fetch(ctx context.Context, opts git.FetchOptions, onProgress func
 
 func (r *Repo) Push(ctx context.Context, opts git.PushOptions, onProgress func(string)) ([]git.PushResult, error) {
 	return r.git.Push(ctx, opts, onProgress)
+}
+
+func (r *Repo) PreviewMerge(ctx context.Context, source, target string) (git.MergePreview, error) {
+	return r.git.PreviewMerge(ctx, source, target)
+}
+
+func (r *Repo) Merge(ctx context.Context, opts git.MergeOptions) (git.MergeResult, error) {
+	return r.git.Merge(ctx, opts)
+}
+
+func (r *Repo) Pull(ctx context.Context, opts git.PullOptions, onProgress func(string)) (git.MergeResult, error) {
+	return r.git.Pull(ctx, opts, onProgress)
+}
+
+func (r *Repo) AbortOperation(ctx context.Context) error { return r.git.AbortOperation(ctx) }
+
+func (r *Repo) FinishOperation(ctx context.Context, message string) error {
+	return r.git.FinishOperation(ctx, message)
+}
+
+func (r *Repo) Revert(ctx context.Context, opts git.ApplyOptions) (git.ApplyResult, error) {
+	return r.git.Revert(ctx, opts)
+}
+
+func (r *Repo) CherryPick(ctx context.Context, opts git.ApplyOptions) (git.ApplyResult, error) {
+	return r.git.CherryPick(ctx, opts)
+}
+
+func (r *Repo) PreviewReset(ctx context.Context, rev string) (git.ResetPreview, error) {
+	return r.git.PreviewReset(ctx, rev)
+}
+
+func (r *Repo) Reset(ctx context.Context, rev string, mode git.ResetMode) error {
+	return r.git.Reset(ctx, rev, mode)
+}
+
+func (r *Repo) Conflicts(ctx context.Context) ([]git.Conflict, error) {
+	return r.git.Conflicts(ctx)
+}
+
+func (r *Repo) ConflictText(ctx context.Context, path string) (git.ConflictText, error) {
+	return r.git.ConflictText(ctx, path)
+}
+
+func (r *Repo) ResolveLines(ctx context.Context, path string, picks []git.ConflictPick) error {
+	return r.git.ResolveLines(ctx, path, picks)
+}
+
+func (r *Repo) Resolve(ctx context.Context, path string, side git.ConflictSide) error {
+	return r.git.Resolve(ctx, path, side)
 }

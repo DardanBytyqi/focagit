@@ -199,7 +199,7 @@ func TestAppearance(t *testing.T) {
 		t.Errorf("Appearance() = %+v, want the default", got)
 	}
 
-	want := Appearance{Theme: "light", Density: "compact", FontSize: 15}
+	want := Appearance{Theme: "light", FontSize: 15}
 	if err := s.SaveAppearance(want); err != nil {
 		t.Fatalf("SaveAppearance: %v", err)
 	}
@@ -208,7 +208,7 @@ func TestAppearance(t *testing.T) {
 	}
 
 	t.Run("values we would not read back are defaulted, not stored", func(t *testing.T) {
-		if err := s.SaveAppearance(Appearance{Theme: "fucsia", Density: "enorme", FontSize: 400}); err != nil {
+		if err := s.SaveAppearance(Appearance{Theme: "fucsia", FontSize: 400}); err != nil {
 			t.Fatal(err)
 		}
 		// A 400px font would make the window unusable and leave no way back.

@@ -71,6 +71,7 @@ func (s *Session) Close(id string) {
 
 	if ok {
 		r.cancelLoad()
+		r.stopWatch()
 	}
 }
 

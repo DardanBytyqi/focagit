@@ -1,108 +1,153 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import type { git } from '@wails/go/models'
+import { git } from '@wails/go/models'
 import { InitialRepo, InitialView } from '@wails/go/main/App'
-import BranchDialog from '@/components/BranchDialog.vue'
-import ChangesView from '@/components/ChangesView.vue'
-import CommitDetail from '@/components/CommitDetail.vue'
-import CommitList from '@/components/CommitList.vue'
-import DeleteBranchDialog from '@/components/DeleteBranchDialog.vue'
-import IdentityDialog from '@/components/IdentityDialog.vue'
-import PushDialog from '@/components/PushDialog.vue'
-import RemoteDialog from '@/components/RemoteDialog.vue'
-import SettingsDialog from '@/components/SettingsDialog.vue'
-import RecentList from '@/components/RecentList.vue'
-import Sidebar from '@/components/Sidebar.vue'
-import StatusBar from '@/components/StatusBar.vue'
-import Toolbar from '@/components/Toolbar.vue'
-import type { BranchRequest, DeleteRequest } from '@/types'
-import { useAppearance } from './composables/useAppearance'
-import { usePrefs } from './composables/usePrefs'
-import { useRepo } from './composables/useRepo'
+import BranchDialog from '@/components/branch/BranchDialog.vue'
+import DeleteBranchDialog from '@/components/branch/DeleteBranchDialog.vue'
+import ChangesView from '@/components/changes/ChangesView.vue'
+import ApplyCommitDialog from '@/components/history/ApplyCommitDialog.vue'
+import HistoryPane from '@/components/history/HistoryPane.vue'
+import ResetDialog from '@/components/history/ResetDialog.vue'
+import ConflictView from '@/components/merge/ConflictView.vue'
+import MergeDropMenu from '@/components/merge/MergeDropMenu.vue'
+import OperationBar from '@/components/merge/OperationBar.vue'
+import CloneDialog from '@/components/remote/CloneDialog.vue'
+import PushDialog from '@/components/remote/PushDialog.vue'
+import RemoteDialog from '@/components/remote/RemoteDialog.vue'
+import IdentityDialog from '@/components/settings/IdentityDialog.vue'
+import SettingsDialog from '@/components/settings/SettingsDialog.vue'
+import Sidebar from '@/components/shell/Sidebar.vue'
+import DropStashDialog from '@/components/stash/DropStashDialog.vue'
+import StashDialog from '@/components/stash/StashDialog.vue'
+import StashView from '@/components/stash/StashView.vue'
+import DeleteTagDialog from '@/components/tag/DeleteTagDialog.vue'
+import TagDialog from '@/components/tag/TagDialog.vue'
+import StatusBar from '@/components/shell/StatusBar.vue'
+import Toolbar from '@/components/shell/Toolbar.vue'
+import Welcome from '@/components/shell/Welcome.vue'
+import { useAppearance } from '@/composables/useAppearance'
+import { useDialogs } from '@/composables/useDialogs'
+import { usePrefs } from '@/composables/usePrefs'
+import { useRepo } from '@/composables/useRepo'
 
-const { state, open, browse, refresh, initHere, checkout, checkoutCommit, fetchAll, push } =
-  useRepo()
+const {
+  state,
+  refsByHash,
+  open,
+  browse,
+  refresh,
+  checkout,
+  checkoutCommit,
+  fetchAll,
+  push,
+  merge,
+  pull,
+  stash,
+  applyStash,
+  popStash,
+  pushTag,
+} = useRepo()
 const { state: prefsState, loadSignature } = usePrefs()
 const { loadAppearance } = useAppearance()
+const dialogs = useDialogs()
+const {
+  open: dialog,
+  branchRequest,
+  deleteRequest,
+  mergeDrop,
+  dropStashRequest,
+  applyRequest,
+  resetRequest,
+  tagRequest,
+  deleteTagRequest,
+} = dialogs
 
-const identityOpen = ref(false)
-const pushOpen = ref(false)
-const remoteOpen = ref(false)
-const settingsOpen = ref(false)
-const settingsSection = ref('appearance')
+/** The main area shows the history, the working tree, or one stash entry. */
+const mode = ref<'commit' | 'changes' | 'stash'>('commit')
+const changeCount = computed(() => state.status?.files?.length ?? 0)
 
-function showSettings(section: string) {
-  settingsSection.value = section
-  settingsOpen.value = true
+const shownStash = ref<git.Stash | null>(null)
+
+/** The commit the list should jump to; the nonce lets the same ref be clicked twice. */
+const reveal = ref<{ hash: string; nonce: number } | null>(null)
+let nonce = 0
+
+// Clicking a ref shows where it points; double-clicking it checks it out.
+function revealRef(r: git.Ref) {
+  mode.value = 'commit'
+  reveal.value = { hash: r.hash, nonce: ++nonce }
 }
 
-// One dialog at a time: the push one steps aside rather than stacking.
-function showSSH() {
-  pushOpen.value = false
-  showSettings('ssh')
-}
-const fetching = ref(false)
-const pushing = ref(false)
+// The plain button takes everything, untracked included; the arrow is for the rest.
+const doStash = () => stash({ message: '', untracked: true, keepIndex: false, paths: [] })
 
-/** Push says nothing when it works; the dialog is only for decisions. */
-async function doPush() {
-  pushing.value = true
-  const res = await push({ remote: '', branch: '', setUpstream: false, force: false, tags: false })
-  pushing.value = false
-  if (!res) pushOpen.value = true
+function showStash(s: git.Stash) {
+  shownStash.value = s
+  mode.value = 'stash'
 }
 
-// Pruning on every fetch: a stale sidebar is worse than a slower fetch.
-async function doFetch() {
-  fetching.value = true
-  await fetchAll({ remote: '', prune: true, tags: false })
-  fetching.value = false
+// Dropped, popped, or gone from outside: there is nothing left on screen to act on.
+watch(
+  () => state.stashes,
+  (list) => {
+    const shown = shownStash.value
+    if (!shown || list.some((s) => s.hash === shown.hash)) return
+    shownStash.value = null
+    if (mode.value === 'stash') mode.value = 'commit'
+  },
+)
+
+// Restoring an entry puts the work back in the tree, which is where to look next.
+async function restoreStash(s: git.Stash, keep: boolean) {
+  const ok = keep ? await applyStash(s.ref, false) : await popStash(s.ref, false)
+  if (ok) {
+    shownStash.value = null
+    mode.value = 'changes'
+  }
 }
 
 // Who commits here is a property of the repository, so it is re-read on every open.
 watch(() => state.info?.id ?? null, loadSignature, { immediate: true })
 
-/** A message shown inside a dialog does not need repeating at the bottom. */
-const dialogOpen = computed(
-  () => identityOpen.value || pushOpen.value || remoteOpen.value || settingsOpen.value,
-)
+// Fetch always prunes: a stale sidebar is worse than a slower fetch.
+const doFetch = () => fetchAll({ remote: '', prune: true, tags: false })
+const doPull = () => pull({ remote: '', prune: true, noFastForward: false })
 
-// One dialog at a time; null means closed.
-const branchRequest = ref<BranchRequest | null>(null)
-const deleteRequest = ref<DeleteRequest | null>(null)
-
-function newBranch(start: string, startLabel: string) {
-  branchRequest.value = { kind: 'create', start, startLabel }
+/** Push says nothing when it works; the window is only for decisions. */
+async function doPush() {
+  const res = await push({ remote: '', branch: '', setUpstream: false, force: false, tags: false })
+  if (!res) dialog.push = true
 }
 
-function renameBranch(from: string) {
-  branchRequest.value = { kind: 'rename', from }
+const doMerge = (r: git.Ref) => merge({ ref: r.short, noFastForward: false, message: '' })
+
+/** A drop is two steps when the target is not where HEAD already is. */
+async function confirmMerge(noFastForward: boolean) {
+  const req = mergeDrop.value
+  mergeDrop.value = null
+  if (!req) return
+
+  if (!req.target.head && !(await checkout(req.target))) return
+  await merge({ ref: req.source.short, noFastForward, message: '' })
+}
+
+// A tag names a commit, so checking one out can only detach HEAD.
+const checkoutTag = (t: git.Tag) => checkoutCommit(t.hash)
+
+function revealTag(t: git.Tag) {
+  mode.value = 'commit'
+  reveal.value = { hash: t.hash, nonce: ++nonce }
+}
+
+// A reset moves the branch HEAD is on, and says which one before it does.
+function askReset(commit: git.Commit) {
+  resetRequest.value = { commit, branch: state.status?.head ?? '' }
 }
 
 // The toolbar branches from wherever HEAD is, named for what the user sees.
 function branchFromHead() {
   const st = state.status
-  newBranch('HEAD', st && !st.detached ? st.head : 'HEAD')
-}
-
-// Horizontal splitter between the history and the commit detail pane.
-const detailHeight = ref(340)
-let dragging = false
-
-const selected = ref<git.Commit | null>(null)
-
-/** The lower pane shows either a commit or the working tree. */
-const mode = ref<'commit' | 'changes'>('commit')
-
-const changeCount = computed(() => state.status?.files?.length ?? 0)
-
-function showCommit(c: git.Commit) {
-  selected.value = c
-  mode.value = 'commit'
-}
-
-function setMode(m: 'commit' | 'changes') {
-  mode.value = m
+  dialogs.newBranch('HEAD', st && !st.detached ? st.head : 'HEAD')
 }
 
 // The native window injects the Go bindings before our script runs.
@@ -115,7 +160,6 @@ async function bindingsReady(timeoutMs = 5000): Promise<boolean> {
   return true
 }
 
-// FOCAGIT_OPEN skips the welcome screen during development.
 onMounted(async () => {
   if (!(await bindingsReady())) {
     state.error = 'the Go bindings never became available'
@@ -126,40 +170,9 @@ onMounted(async () => {
 
   const path = await InitialRepo()
   if (path) await open(path)
-  if ((await InitialView()) === 'changes') setMode('changes')
+  // FOCAGIT_OPEN skips the welcome screen during development.
+  if ((await InitialView()) === 'changes') mode.value = 'changes'
 })
-
-// Refs indexed by the commit they point at.
-const refsByHash = computed(() => {
-  const m = new Map<string, git.Ref[]>()
-  for (const r of state.refs) {
-    const list = m.get(r.hash)
-    if (list) list.push(r)
-    else m.set(r.hash, [r])
-  }
-  return m
-})
-
-
-function startDrag(e: MouseEvent) {
-  dragging = true
-  const startY = e.clientY
-  const startHeight = detailHeight.value
-
-  const onMove = (ev: MouseEvent) => {
-    if (!dragging) return
-    // Clamped so neither pane can be dragged out of existence.
-    detailHeight.value = Math.min(600, Math.max(80, startHeight - (ev.clientY - startY)))
-  }
-  const onUp = () => {
-    dragging = false
-    window.removeEventListener('mousemove', onMove)
-    window.removeEventListener('mouseup', onUp)
-  }
-
-  window.addEventListener('mousemove', onMove)
-  window.addEventListener('mouseup', onUp)
-}
 </script>
 
 <template>
@@ -168,29 +181,49 @@ function startDrag(e: MouseEvent) {
       :info="state.info"
       :status="state.status"
       :signature="prefsState.signature"
-      :busy="fetching || pushing"
+      :busy="state.busy"
       @browse="browse"
-      @refresh="refresh"
+      @clone="dialog.clone = true"
       @branch="branchFromHead"
-      @identity="identityOpen = true"
+      @identity="dialog.identity = true"
       @fetch="doFetch"
+      @pull="doPull"
       @push="doPush"
-      @push-options="pushOpen = true"
-      @settings="showSettings"
+      @push-options="dialog.push = true"
+      @stash="doStash"
+      @stash-options="dialog.stash = true"
+      @settings="dialogs.showSettings"
     />
+
+    <OperationBar v-if="state.status?.operation" @resolve="dialog.conflicts = true" />
 
     <div class="body">
       <Sidebar
         v-if="state.info"
         :refs="state.refs"
+        :tags="state.tags"
+        :stashes="state.stashes"
         :change-count="changeCount"
         :mode="mode"
-        @mode="setMode"
+        :head="state.status?.head ?? ''"
+        @mode="mode = $event"
+        @reveal="revealRef"
         @checkout="checkout"
-        @create="newBranch"
-        @rename="renameBranch"
+        @merge="doMerge"
+        @merge-drop="(s, t, x, y) => (mergeDrop = { source: s, target: t, x, y })"
+        @create="dialogs.newBranch"
+        @rename="dialogs.renameBranch"
         @remove="deleteRequest = { name: $event }"
-        @add-remote="remoteOpen = true"
+        @add-remote="dialog.remote = true"
+        @reveal-tag="revealTag"
+        @checkout-tag="checkoutTag"
+        @branch-from-tag="(t) => dialogs.newBranch(t.name, t.name)"
+        @push-tag="(t) => pushTag(t.name, false)"
+        @delete-tag="deleteTagRequest = $event"
+        @show-stash="showStash"
+        @apply-stash="restoreStash($event, true)"
+        @pop-stash="restoreStash($event, false)"
+        @drop-stash="dropStashRequest = $event"
       />
 
       <main class="main">
@@ -201,50 +234,33 @@ function startDrag(e: MouseEvent) {
             :status="state.status"
             @changed="refresh"
           />
-
-          <template v-else>
-            <div class="history">
-              <CommitList
-                :repo-id="state.info.id"
-                :count="state.count"
-                :width="state.width"
-                :gen="state.gen"
-                :refs-by-hash="refsByHash"
-                @select="showCommit"
-                @branch="newBranch"
-                @checkout="checkoutCommit"
-              />
-            </div>
-
-            <div class="splitter" @mousedown.prevent="startDrag"></div>
-
-            <section class="detail" :style="{ height: detailHeight + 'px' }">
-              <CommitDetail :repo-id="state.info.id" :commit="selected" />
-            </section>
-          </template>
+          <StashView
+            v-else-if="mode === 'stash' && shownStash"
+            :repo-id="state.info.id"
+            :stash="shownStash"
+            @pop="restoreStash(shownStash, false)"
+            @apply="restoreStash(shownStash, true)"
+            @drop="dropStashRequest = shownStash"
+          />
+          <HistoryPane
+            v-else
+            :repo-id="state.info.id"
+            :count="state.count"
+            :width="state.width"
+            :gen="state.gen"
+            :refs-by-hash="refsByHash"
+            :head="state.status?.head ?? ''"
+            :reveal="reveal"
+            @branch="dialogs.newBranch"
+            @checkout="checkoutCommit"
+            @tag="tagRequest = { commit: $event }"
+            @revert="applyRequest = { kind: 'revert', commit: $event }"
+            @cherry-pick="applyRequest = { kind: 'cherry-pick', commit: $event }"
+            @reset="askReset"
+          />
         </template>
 
-        <div v-else class="welcome">
-          <h1>focagit</h1>
-
-          <template v-if="state.initCandidate">
-            <p class="muted">
-              <span class="mono">{{ state.initCandidate }}</span> is not a repository yet.
-            </p>
-            <div class="row">
-              <button class="primary" @click="initHere">Initialise repository here</button>
-              <button @click="browse">Choose another folder…</button>
-            </div>
-          </template>
-
-          <template v-else>
-            <p class="muted">Open a repository to get started.</p>
-            <button class="primary" @click="browse">Open repository…</button>
-            <RecentList @open="open" />
-          </template>
-
-          <p v-if="state.error" class="error">{{ state.error }}</p>
-        </div>
+        <Welcome v-else />
       </main>
     </div>
 
@@ -253,25 +269,34 @@ function startDrag(e: MouseEvent) {
       :status="state.status"
       :count="state.count"
       :loading="state.loading"
-      :error="dialogOpen ? '' : state.error"
+      :error="dialogs.anyOpen.value ? '' : state.error"
       :network="state.network"
     />
 
+    <CloneDialog :open="dialog.clone" @close="dialog.clone = false" />
     <BranchDialog :request="branchRequest" @close="branchRequest = null" />
     <DeleteBranchDialog :request="deleteRequest" @close="deleteRequest = null" />
     <IdentityDialog
-      :open="identityOpen"
+      :open="dialog.identity"
       :repo-id="state.info?.id ?? null"
       :repo-name="state.info?.name ?? ''"
-      @close="identityOpen = false"
+      @close="dialog.identity = false"
     />
-    <PushDialog :open="pushOpen" @close="pushOpen = false" @ssh="showSSH" />
+    <PushDialog :open="dialog.push" @close="dialog.push = false" @ssh="dialogs.showSSH" />
     <SettingsDialog
-      :open="settingsOpen"
-      :section="settingsSection"
-      @close="settingsOpen = false"
+      :open="dialog.settings"
+      :section="dialogs.settingsSection.value"
+      @close="dialog.settings = false"
     />
-    <RemoteDialog :open="remoteOpen" @close="remoteOpen = false" />
+    <RemoteDialog :open="dialog.remote" @close="dialog.remote = false" />
+    <StashDialog :open="dialog.stash" @close="dialog.stash = false" />
+    <DropStashDialog :stash="dropStashRequest" @close="dropStashRequest = null" />
+    <ApplyCommitDialog :request="applyRequest" @close="applyRequest = null" />
+    <ResetDialog :request="resetRequest" @close="resetRequest = null" />
+    <TagDialog :request="tagRequest" @close="tagRequest = null" />
+    <DeleteTagDialog :tag="deleteTagRequest" @close="deleteTagRequest = null" />
+    <MergeDropMenu :drop="mergeDrop" @merge="confirmMerge" @close="mergeDrop = null" />
+    <ConflictView :open="dialog.conflicts" @close="dialog.conflicts = false" />
   </div>
 </template>
 
@@ -294,72 +319,5 @@ function startDrag(e: MouseEvent) {
   flex: 1;
   min-width: 0;
   min-height: 0;
-}
-
-.history {
-  flex: 1;
-  min-height: 0;
-}
-
-.splitter {
-  height: 5px;
-  background: var(--border);
-  cursor: row-resize;
-  flex: none;
-}
-
-.splitter:hover {
-  background: var(--accent);
-}
-
-.detail {
-  flex: none;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.welcome {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.welcome .row {
-  display: flex;
-  gap: 8px;
-}
-
-.welcome .mono {
-  font-family: var(--font-mono);
-  color: var(--text);
-}
-
-.welcome h1 {
-  margin: 0;
-  font-size: 30px;
-  font-weight: 300;
-  letter-spacing: 0.06em;
-}
-
-.primary {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-  padding: 7px 16px;
-}
-
-.primary:hover {
-  filter: brightness(1.1);
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.error {
-  color: var(--red);
-  max-width: 60ch;
-  text-align: center;
 }
 </style>
