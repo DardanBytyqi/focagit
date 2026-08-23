@@ -9,7 +9,7 @@ import {
   ContextMenuTrigger,
 } from 'reka-ui'
 import type { git, session } from '@wails/go/models'
-import { CommitIndex, CommitRange } from '@wails/go/main/App'
+import { CommitIndex, CommitRange, SearchCommits } from '@wails/go/main/App'
 import { formatDate } from '@/utils/format'
 import RefIcon from '@/components/shell/RefIcon.vue'
 
@@ -150,6 +150,68 @@ watch(
   },
 )
 
+// ---- search ---------------------------------------------------------------
+
+const finding = ref(false)
+const findInput = ref<HTMLInputElement | null>(null)
+const query = ref('')
+const matches = ref<number[]>([])
+const current = ref(0)
+
+const matchRows = computed(() => new Set(matches.value))
+
+async function runSearch() {
+  const q = query.value
+  matches.value = q ? await SearchCommits(props.repoId, q) : []
+  current.value = 0
+  if (matches.value.length) void goTo(0)
+}
+
+let timer: number | undefined
+watch(query, () => {
+  clearTimeout(timer)
+  timer = window.setTimeout(runSearch, 120)
+})
+
+/** Scrolls to the nth match and selects it, exactly as revealing a ref does. */
+async function goTo(n: number) {
+  const i = matches.value[n]
+  if (i === undefined) return
+
+  current.value = n
+  scrollTo(i)
+  await fetchPage(Math.floor(i / PAGE))
+  const entry = entryAt(i)
+  if (entry) select(entry)
+}
+
+/** Steps through the matches, wrapping at either end. */
+function step(d: number) {
+  const n = matches.value.length
+  if (!n) return
+  void goTo((current.value + d + n) % n)
+}
+
+function openFind() {
+  finding.value = true
+  void nextTick(() => findInput.value?.select())
+}
+
+function closeFind() {
+  finding.value = false
+  query.value = ''
+  matches.value = []
+}
+
+function onKey(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+    e.preventDefault()
+    openFind()
+  } else if (e.key === 'Escape' && finding.value) {
+    closeFind()
+  }
+}
+
 // ---- graph geometry -------------------------------------------------------
 
 /** Horizontal centre of a lane. Lanes past the cap pile up on the last one. */
@@ -204,6 +266,7 @@ watch(
     pages.value = new Map()
     partial.clear()
     ensureVisiblePages()
+    void runSearch()
   },
 )
 
@@ -213,6 +276,7 @@ watch(
     pages.value = new Map()
     partial.clear()
     selected.value = ''
+    closeFind()
     if (viewport.value) viewport.value.scrollTop = 0
     scrollTop.value = 0
     ensureVisiblePages()
@@ -222,6 +286,7 @@ watch(
 let observer: ResizeObserver | null = null
 
 onMounted(() => {
+  window.addEventListener('keydown', onKey)
   if (!viewport.value) return
   viewportHeight.value = viewport.value.clientHeight
   observer = new ResizeObserver(() => {
@@ -231,11 +296,30 @@ onMounted(() => {
   ensureVisiblePages()
 })
 
-onBeforeUnmount(() => observer?.disconnect())
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey)
+  observer?.disconnect()
+})
 </script>
 
 <template>
   <div class="commit-list" :style="{ '--graph-w': graphWidth + 'px' }">
+    <div v-if="finding" class="find">
+      <input
+        ref="findInput"
+        v-model="query"
+        class="find-input"
+        placeholder="Search message, author or hash"
+        @keydown.enter.prevent="step($event.shiftKey ? -1 : 1)"
+      />
+      <span class="find-count muted">
+        {{ matches.length ? `${current + 1}/${matches.length}` : query ? 'none' : '' }}
+      </span>
+      <button class="find-btn" :disabled="!matches.length" @click="step(-1)">‹</button>
+      <button class="find-btn" :disabled="!matches.length" @click="step(1)">›</button>
+      <button class="find-btn" @click="closeFind">✕</button>
+    </div>
+
     <div class="header">
       <span></span>
       <span>Description</span>
@@ -250,7 +334,11 @@ onBeforeUnmount(() => observer?.disconnect())
           <ContextMenuTrigger as-child :disabled="!row.entry">
             <div
               class="row"
-              :class="{ selected: row.entry && row.entry.commit.hash === selected }"
+              :class="{
+                selected: row.entry && row.entry.commit.hash === selected,
+                match: matchRows.has(row.index),
+                'match-current': matches[current] === row.index,
+              }"
               :style="{ transform: `translateY(${row.index * ROW}px)` }"
               @click="row.entry && select(row.entry)"
             >
@@ -412,6 +500,59 @@ onBeforeUnmount(() => observer?.disconnect())
 
 .row.selected {
   background: var(--bg-selected);
+}
+
+.row.match {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.row.match-current {
+  background: color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+.find {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.find-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  color: inherit;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  outline: none;
+}
+
+.find-input:focus {
+  border-color: var(--accent);
+}
+
+.find-count {
+  min-width: 48px;
+  text-align: right;
+}
+
+.find-btn {
+  padding: 1px 7px;
+  color: inherit;
+  cursor: default;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.find-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.find-btn:disabled {
+  opacity: 0.4;
 }
 
 /* The lines are drawn open; only the dot is filled. */

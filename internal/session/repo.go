@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -203,6 +204,30 @@ func (r *Repo) Range(offset, count int) []Entry {
 	// Copy rather than return a subslice: the backing array keeps growing underneath.
 	out := make([]Entry, end-offset)
 	copy(out, r.entries[offset:end])
+	return out
+}
+
+// Search returns the rows whose commit matches q, in history order.
+func (r *Repo) Search(q string) []int {
+	q = strings.ToLower(strings.TrimSpace(q))
+	out := []int{}
+	if q == "" {
+		return out
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for i, e := range r.entries {
+		c := e.Commit
+		if strings.HasPrefix(c.Hash, q) ||
+			strings.Contains(strings.ToLower(c.Subject), q) ||
+			strings.Contains(strings.ToLower(c.Body), q) ||
+			strings.Contains(strings.ToLower(c.Author.Name), q) ||
+			strings.Contains(strings.ToLower(c.Author.Email), q) {
+			out = append(out, i)
+		}
+	}
 	return out
 }
 

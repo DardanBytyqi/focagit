@@ -244,6 +244,15 @@ func (a *App) CommitRange(id string, offset, count int) ([]session.Entry, error)
 	return repo.Range(offset, count), nil
 }
 
+// SearchCommits is the rows of the cached history whose commit matches query.
+func (a *App) SearchCommits(id, query string) ([]int, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	return repo.Search(query), nil
+}
+
 // CommitIndex is the row a commit sits on, so the list can scroll to it, or -1
 // when the history does not hold it.
 func (a *App) CommitIndex(id, hash string) (int, error) {
