@@ -84,7 +84,8 @@ func (a *App) reload(repo *session.Repo) {
 				ID: repo.Info.ID, Gen: gen, Loaded: loaded, Width: width, Done: done,
 			})
 		})
-		if err != nil {
+		// A cancelled walk was replaced by a newer one, which reports for itself.
+		if err != nil && !errors.Is(err, context.Canceled) {
 			runtime.EventsEmit(a.ctx, "repo:progress", Progress{
 				ID: repo.Info.ID, Gen: repo.Gen(), Done: true, Error: err.Error(),
 			})
