@@ -23,6 +23,7 @@ import StashView from '@/components/stash/StashView.vue'
 import DeleteTagDialog from '@/components/tag/DeleteTagDialog.vue'
 import TagDialog from '@/components/tag/TagDialog.vue'
 import StatusBar from '@/components/shell/StatusBar.vue'
+import TabBar from '@/components/shell/TabBar.vue'
 import Toolbar from '@/components/shell/Toolbar.vue'
 import Welcome from '@/components/shell/Welcome.vue'
 import { useAppearance } from '@/composables/useAppearance'
@@ -34,6 +35,8 @@ const {
   state,
   refsByHash,
   open,
+  switchTo,
+  close,
   browse,
   refresh,
   checkout,
@@ -177,13 +180,21 @@ onMounted(async () => {
 
 <template>
   <div class="app">
+    <TabBar
+      :tabs="state.tabs"
+      :active-id="state.info?.id ?? ''"
+      :busy="state.busy"
+      @select="switchTo"
+      @close="close"
+      @open="browse"
+      @clone="dialog.clone = true"
+    />
+
     <Toolbar
       :info="state.info"
       :status="state.status"
       :signature="prefsState.signature"
       :busy="state.busy"
-      @browse="browse"
-      @clone="dialog.clone = true"
       @branch="branchFromHead"
       @identity="dialog.identity = true"
       @fetch="doFetch"

@@ -18,8 +18,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  browse: []
-  clone: []
   branch: []
   identity: []
   fetch: []
@@ -66,11 +64,6 @@ const branchTitle = computed(() => {
 
 <template>
   <div class="toolbar">
-    <button @click="emit('browse')">Open…</button>
-    <button :disabled="busy" @click="emit('clone')">Clone…</button>
-
-    <span class="sep"></span>
-
     <button
       :disabled="!info || busy"
       title="Bring down remote branches without touching yours"
