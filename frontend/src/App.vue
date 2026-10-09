@@ -44,6 +44,7 @@ const {
   fetchAll,
   push,
   merge,
+  rebase,
   pull,
   stash,
   applyStash,
@@ -134,6 +135,18 @@ async function confirmMerge(noFastForward: boolean) {
   await merge({ ref: req.source.short, noFastForward, message: '' })
 }
 
+const doRebase = (onto: string) => rebase({ onto })
+
+/** Dropping a branch on another rebases the one it landed on, as merge does. */
+async function confirmRebase() {
+  const req = mergeDrop.value
+  mergeDrop.value = null
+  if (!req) return
+
+  if (!req.target.head && !(await checkout(req.target))) return
+  await rebase({ onto: req.source.short })
+}
+
 // A tag names a commit, so checking one out can only detach HEAD.
 const checkoutTag = (t: git.Tag) => checkoutCommit(t.hash)
 
@@ -221,6 +234,7 @@ onMounted(async () => {
         @reveal="revealRef"
         @checkout="checkout"
         @merge="doMerge"
+        @rebase="(r) => doRebase(r.short)"
         @merge-drop="(s, t, x, y) => (mergeDrop = { source: s, target: t, x, y })"
         @create="dialogs.newBranch"
         @rename="dialogs.renameBranch"
@@ -268,6 +282,7 @@ onMounted(async () => {
             @revert="applyRequest = { kind: 'revert', commit: $event }"
             @cherry-pick="applyRequest = { kind: 'cherry-pick', commit: $event }"
             @reset="askReset"
+            @rebase="doRebase"
           />
         </template>
 
@@ -306,7 +321,12 @@ onMounted(async () => {
     <ResetDialog :request="resetRequest" @close="resetRequest = null" />
     <TagDialog :request="tagRequest" @close="tagRequest = null" />
     <DeleteTagDialog :tag="deleteTagRequest" @close="deleteTagRequest = null" />
-    <MergeDropMenu :drop="mergeDrop" @merge="confirmMerge" @close="mergeDrop = null" />
+    <MergeDropMenu
+      :drop="mergeDrop"
+      @merge="confirmMerge"
+      @rebase="confirmRebase"
+      @close="mergeDrop = null"
+    />
     <ConflictView :open="dialog.conflicts" @close="dialog.conflicts = false" />
   </div>
 </template>

@@ -31,6 +31,7 @@ import {
   Pull,
   Push,
   PushTag,
+  Rebase,
   Refs,
   RemoveRemote,
   RenameBranch,
@@ -38,6 +39,7 @@ import {
   ResolveConflict,
   ResolveLines,
   Revert,
+  SkipOperation,
   SelectRepo,
   StageFiles,
   Stash,
@@ -401,8 +403,14 @@ async function run<T>(fn: (id: string) => Promise<T>): Promise<T | null> {
   }
 }
 
+/** Rebases and returns what it turned out to be, or null when git refused. */
+async function rebase(opts: git.RebaseOptions): Promise<git.RebaseResult | null> {
+  return working(() => run((id) => Rebase(id, opts)))
+}
+
 const abortOperation = () => act((id) => AbortOperation(id))
 const finishOperation = (message: string) => act((id) => FinishOperation(id, message))
+const skipOperation = () => act((id) => SkipOperation(id))
 const resolveConflict = (path: string, side: 'ours' | 'theirs') =>
   act((id) => ResolveConflict(id, path, side))
 
@@ -484,6 +492,7 @@ export function useRepo() {
     fetchAll,
     push,
     merge,
+    rebase,
     previewMerge,
     pull,
     revert,
@@ -492,6 +501,7 @@ export function useRepo() {
     previewReset,
     abortOperation,
     finishOperation,
+    skipOperation,
     resolveConflict,
     conflictText,
     resolveLines,

@@ -13,7 +13,7 @@ import { useRepo } from '@/composables/useRepo'
 import type { MergeDrop } from '@/types'
 
 const props = defineProps<{ drop: MergeDrop | null }>()
-const emit = defineEmits<{ merge: [noFastForward: boolean]; close: [] }>()
+const emit = defineEmits<{ merge: [noFastForward: boolean]; rebase: []; close: [] }>()
 
 const { previewMerge } = useRepo()
 
@@ -70,6 +70,16 @@ const switching = computed(() => props.drop && !props.drop.target.head)
           >
             Merge without fast-forward
             <span class="note">keeps the branch visible in the graph</span>
+          </DropdownMenuItem>
+
+          <!-- Behind is a fast-forward either way, so rebasing adds nothing there. -->
+          <DropdownMenuItem
+            v-if="preview && !preview.fastForward"
+            class="menu-item"
+            @select="emit('rebase')"
+          >
+            Rebase {{ drop?.target.short }} on {{ drop?.source.short }}
+            <span v-if="switching" class="note">switches to {{ drop?.target.short }}</span>
           </DropdownMenuItem>
         </template>
 

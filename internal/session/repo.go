@@ -431,7 +431,13 @@ func (r *Repo) Pull(ctx context.Context, opts git.PullOptions, onProgress func(s
 	return r.git.Pull(ctx, opts, onProgress)
 }
 
+func (r *Repo) Rebase(ctx context.Context, opts git.RebaseOptions) (git.RebaseResult, error) {
+	return r.git.Rebase(ctx, opts)
+}
+
 func (r *Repo) AbortOperation(ctx context.Context) error { return r.git.AbortOperation(ctx) }
+
+func (r *Repo) SkipOperation(ctx context.Context) error { return r.git.SkipOperation(ctx) }
 
 func (r *Repo) FinishOperation(ctx context.Context, message string) error {
 	return r.git.FinishOperation(ctx, message)

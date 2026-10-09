@@ -27,6 +27,7 @@ const emit = defineEmits<{
   reveal: [r: git.Ref]
   checkout: [r: git.Ref]
   merge: [r: git.Ref]
+  rebase: [r: git.Ref]
   mergeDrop: [source: git.Ref, target: git.Ref, x: number, y: number]
   create: [start: string, label: string]
   rename: [name: string]
@@ -193,6 +194,9 @@ function toggle(key: string) {
               <!-- Merging a branch into itself is the one thing it cannot do. -->
               <ContextMenuItem v-if="canMerge(r)" class="menu-item" @select="emit('merge', r)">
                 Merge {{ r.short }} into {{ head }}
+              </ContextMenuItem>
+              <ContextMenuItem v-if="canMerge(r)" class="menu-item" @select="emit('rebase', r)">
+                Rebase {{ head }} on {{ r.short }}
               </ContextMenuItem>
 
               <ContextMenuItem class="menu-item" @select="emit('create', r.short, r.short)">

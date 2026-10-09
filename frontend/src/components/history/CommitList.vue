@@ -34,6 +34,7 @@ const emit = defineEmits<{
   revert: [commit: git.Commit]
   cherryPick: [commit: git.Commit]
   reset: [commit: git.Commit]
+  rebase: [hash: string]
 }>()
 
 /** Virtualised list. */
@@ -431,6 +432,13 @@ onBeforeUnmount(() => {
               </ContextMenuItem>
 
               <ContextMenuSeparator class="menu-sep" />
+              <ContextMenuItem
+                class="menu-item"
+                :disabled="!head"
+                @select="emit('rebase', row.entry!.commit.hash)"
+              >
+                Rebase {{ head || 'HEAD' }} on this commit
+              </ContextMenuItem>
               <!-- A reset moves a branch, so there has to be one to move. -->
               <ContextMenuItem
                 class="menu-item danger"

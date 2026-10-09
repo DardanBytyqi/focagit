@@ -22,6 +22,7 @@ const emit = defineEmits<{
   revert: [commit: git.Commit]
   cherryPick: [commit: git.Commit]
   reset: [commit: git.Commit]
+  rebase: [hash: string]
 }>()
 
 /** Which commit the lower pane is showing; nothing else needs to know. */
@@ -47,6 +48,7 @@ const detailHeight = ref(340)
       @revert="emit('revert', $event)"
       @cherry-pick="emit('cherryPick', $event)"
       @reset="emit('reset', $event)"
+      @rebase="emit('rebase', $event)"
     />
   </div>
 

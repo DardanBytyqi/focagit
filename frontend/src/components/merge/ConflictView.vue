@@ -7,7 +7,8 @@ import { useRepo } from '@/composables/useRepo'
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
-const { state, conflictText, resolveLines, resolveConflict, markResolved } = useRepo()
+const { state, conflictText, resolveLines, resolveConflict, markResolved, finishOperation } =
+  useRepo()
 
 type Pick = 'ours' | 'theirs' | 'both' | 'none'
 
@@ -23,8 +24,45 @@ const isOpen = computed({
   },
 })
 
-const mine = computed(() => state.status?.head ?? 'mine')
-const theirs = computed(() => state.status?.operationFrom ?? 'theirs')
+const rebase = computed(() => state.status?.rebase ?? null)
+
+const op = computed(() => state.status?.operation ?? '')
+
+// The sides are named after what they are, never "mine" and "theirs": in a
+// rebase git's "ours" is what the commit is being replayed on, and "theirs" is
+// the user's own commit, so either word would point at the wrong side.
+const mine = computed(() => rebase.value?.onto || state.status?.head || 'HEAD')
+// Go labels a commit "<short hash> <subject>"; here only the subject means anything.
+const theirs = computed(() => {
+  const from = state.status?.operationFrom ?? ''
+  return op.value === 'merge' ? from : from.replace(/^[0-9a-f]{7,40} /, '')
+})
+
+/** What the incoming side is called on the buttons; a merge brings a branch. */
+const theirsLabel = computed(() => {
+  switch (op.value) {
+    case 'rebase':
+      return 'Your commit'
+    case 'cherry-pick':
+      return 'Picked commit'
+    case 'revert':
+      return 'Revert'
+    default:
+      return theirs.value || 'Incoming'
+  }
+})
+
+/** A rebase stops once per conflicting commit, so the title says which one. */
+const title = computed(() =>
+  rebase.value?.steps
+    ? `Resolve conflicts · ${rebase.value.step}/${rebase.value.steps}`
+    : 'Resolve conflicts',
+)
+
+/** The same name inside a sentence, where only a branch keeps its capital. */
+const theirsInText = computed(() =>
+  op.value === 'merge' ? theirsLabel.value : theirsLabel.value.toLowerCase(),
+)
 
 /** The file being shown, as the conflict list knows it. */
 const current = computed(() => state.conflicts.find((c) => c.path === path.value) ?? null)
@@ -39,15 +77,36 @@ async function select(next: string) {
   picks.value = Array(got?.count ?? 0).fill('none') as Pick[]
 }
 
+/** True while a rebase is being moved on to its next commit. */
+const continuing = ref(false)
+
+/**
+ * A rebase stops once per conflicting commit. Having resolved one, there is
+ * nothing left to decide before the next, so it carries on by itself and the
+ * window stays open if the next commit conflicts too.
+ */
+async function continueRebase() {
+  continuing.value = true
+  const ok = await finishOperation('')
+  continuing.value = false
+  if (!ok || !state.conflicts.length) {
+    emit('close')
+    return
+  }
+  // The refresh that brought the next conflicts landed while the watcher stood aside.
+  void select(state.conflicts[0].path)
+}
+
 // Opening, and every resolved file, lands on whatever is still left to do.
 watch(
   [() => props.open, () => state.conflicts.map((c) => c.path).join('\n')],
   () => {
-    if (!props.open) return
+    if (!props.open || continuing.value) return
     const paths = state.conflicts.map((c) => c.path)
     // The last file resolved is the end of the job, not an empty window.
     if (!paths.length) {
-      emit('close')
+      if (state.status?.operation === 'rebase') void continueRebase()
+      else emit('close')
       return
     }
     if (paths.includes(path.value)) return
@@ -115,7 +174,7 @@ async function keepAsIs() {
 </script>
 
 <template>
-  <Modal v-model:open="isOpen" title="Resolve conflicts" :width="1320" fill>
+  <Modal v-model:open="isOpen" :title="title" :width="1320" fill>
     <div class="resolver">
       <nav class="files">
         <button
@@ -135,8 +194,12 @@ async function keepAsIs() {
           <span class="name mono">{{ path }}</span>
           <span class="spacer"></span>
           <template v-if="text?.count">
-            <button type="button" class="side-btn mine" @click="all('ours')">All mine</button>
-            <button type="button" class="side-btn theirs" @click="all('theirs')">All theirs</button>
+            <button type="button" class="side-btn mine" @click="all('ours')">
+              All from {{ mine }}
+            </button>
+            <button type="button" class="side-btn theirs" @click="all('theirs')">
+              All from {{ theirsInText }}
+            </button>
           </template>
         </header>
 
@@ -146,7 +209,7 @@ async function keepAsIs() {
           <p class="hint">{{ wholeReason }}</p>
           <div class="actions">
             <button type="button" class="side-btn mine" :disabled="busy" @click="keepWhole('ours')">
-              {{ current?.ours ? 'Keep my version' : 'Delete it' }}
+              {{ current?.ours ? `Keep ${mine}` : 'Delete it' }}
             </button>
             <button
               type="button"
@@ -154,7 +217,7 @@ async function keepAsIs() {
               :disabled="busy"
               @click="keepWhole('theirs')"
             >
-              {{ current?.theirs ? 'Keep their version' : 'Delete it' }}
+              {{ current?.theirs ? `Keep ${theirsInText}` : 'Delete it' }}
             </button>
             <!-- Only when the file on disk is a real merged version already. -->
             <button v-if="both && !text?.binary" type="button" :disabled="busy" @click="keepAsIs">
@@ -179,7 +242,7 @@ async function keepAsIs() {
                   :class="{ on: picks[conflictIndex[si]] === 'ours' }"
                   @click="choose(conflictIndex[si], 'ours')"
                 >
-                  Mine
+                  {{ mine }}
                 </button>
                 <button
                   type="button"
@@ -187,7 +250,7 @@ async function keepAsIs() {
                   :class="{ on: picks[conflictIndex[si]] === 'theirs' }"
                   @click="choose(conflictIndex[si], 'theirs')"
                 >
-                  Theirs
+                  {{ theirsLabel }}
                 </button>
                 <button
                   type="button"
@@ -214,8 +277,9 @@ async function keepAsIs() {
     <div class="actions">
       <!-- The colours are the legend: the same two are on every button. -->
       <span class="legend">
-        <span class="swatch mine"></span>Mine <b>{{ mine }}</b>
-        <span class="swatch theirs"></span>Theirs <b>{{ theirs }}</b>
+        <span class="swatch mine"></span><b>{{ mine }}</b> <span class="swatch theirs"></span
+        >{{ theirsLabel }}
+        <b v-if="op !== 'merge'">{{ theirs }}</b>
       </span>
       <span class="spacer"></span>
       <button type="button" @click="emit('close')">Close</button>
@@ -223,10 +287,10 @@ async function keepAsIs() {
         v-if="text?.count"
         type="button"
         class="primary"
-        :disabled="!canApply || busy"
+        :disabled="!canApply || busy || continuing"
         @click="apply"
       >
-        Apply to {{ path.split('/').pop() }}
+        {{ continuing ? 'Continuing the rebase…' : `Apply to ${path.split('/').pop()}` }}
       </button>
     </div>
   </Modal>

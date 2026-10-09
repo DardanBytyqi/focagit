@@ -93,8 +93,10 @@ type Status struct {
 	// Operation is the multi-step operation left open, empty when there is none.
 	Operation Operation `json:"operation"`
 	// OperationFrom names what that operation is applying.
-	OperationFrom string       `json:"operationFrom"`
-	Files         []FileStatus `json:"files"`
+	OperationFrom string `json:"operationFrom"`
+	// Rebase says how far an open rebase has got; nil for every other operation.
+	Rebase *RebaseState `json:"rebase,omitempty"`
+	Files  []FileStatus `json:"files"`
 }
 
 // IsClean reports whether there is nothing to commit and nothing untracked.

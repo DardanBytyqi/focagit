@@ -756,7 +756,22 @@ func (a *App) Pull(id string, opts git.PullOptions) (git.MergeResult, error) {
 	return res, nil
 }
 
-// AbortOperation throws away the merge, revert or cherry-pick left half-finished.
+// Rebase replays the current branch on top of another ref and reloads what changed.
+func (a *App) Rebase(id string, opts git.RebaseOptions) (git.RebaseResult, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.RebaseResult{}, err
+	}
+	res, err := repo.Rebase(a.ctx, opts)
+	// A refused rebase can still have stopped halfway, so the views reload either way.
+	a.reload(repo)
+	if err != nil {
+		return git.RebaseResult{}, err
+	}
+	return res, nil
+}
+
+// AbortOperation throws away the merge, rebase, revert or cherry-pick left half-finished.
 func (a *App) AbortOperation(id string) error {
 	repo, err := a.session.Get(id)
 	if err != nil {
@@ -776,6 +791,19 @@ func (a *App) FinishOperation(id, message string) error {
 		return err
 	}
 	if err := repo.FinishOperation(a.ctx, message); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// SkipOperation drops the commit a rebase stopped on and carries on with the rest.
+func (a *App) SkipOperation(id string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.SkipOperation(a.ctx); err != nil {
 		return err
 	}
 	a.reload(repo)
