@@ -41,7 +41,7 @@ type Appearance struct {
 
 // DefaultAppearance is what a fresh installation looks like.
 func DefaultAppearance() Appearance {
-	return Appearance{Theme: "dark", FontSize: 13}
+	return Appearance{Theme: "dark", FontSize: 14}
 }
 
 // normalise replaces anything unrecognised with the default.

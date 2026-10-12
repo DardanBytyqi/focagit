@@ -63,16 +63,8 @@ h1 {
 }
 
 .primary {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-  padding: 7px 16px;
-}
-
-.primary:hover {
-  filter: brightness(1.1);
-  background: var(--accent);
-  border-color: var(--accent);
+  height: 36px;
+  padding: 0 18px;
 }
 
 .error {

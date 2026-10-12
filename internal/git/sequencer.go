@@ -42,8 +42,7 @@ var opHeads = []struct {
 
 // Operation reports what is half-finished, and the commit it is applying.
 func (r *Repo) Operation() (Operation, string) {
-	// A rebase is open for as long as its directory is, even between commits,
-	// and it replays with the same machinery, so it is asked about first.
+	// Asked first: a rebase is open as long as its directory is, even between commits.
 	if dir := r.rebaseDir(); dir != "" {
 		return OpRebase, r.rebaseStopped(dir)
 	}
@@ -213,8 +212,7 @@ func (r *Repo) SkipOperation(ctx context.Context) error {
 	}
 }
 
-// proceed moves an operation on by one commit. A rebase that stops again on
-// the next commit's conflicts has moved on, so that is not a failure.
+// proceed moves an operation on by one commit; stopping on the next conflict is not a failure.
 func (r *Repo) proceed(ctx context.Context, op Operation, flag string) error {
 	_, err := r.run.outputQuiet(ctx, string(op), flag)
 	if err == nil {

@@ -18,11 +18,9 @@ const changes = computed(() => props.status?.files?.length ?? 0)
 <template>
   <div class="statusbar">
     <template v-if="info">
-      <span class="path mono">{{ info.path }}</span>
-      <span class="sep">·</span>
+      <span class="path">{{ info.path }}</span>
       <span>{{ count.toLocaleString() }} commits</span>
       <span v-if="loading" class="loading">loading…</span>
-      <span class="sep">·</span>
       <span :class="{ dirty: changes > 0 }">
         {{ changes === 0 ? 'clean' : `${changes} change${changes === 1 ? '' : 's'}` }}
       </span>
@@ -39,13 +37,13 @@ const changes = computed(() => props.status?.files?.length ?? 0)
 .statusbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 18px;
   height: var(--statusbar-height);
-  padding: 0 10px;
-  background: var(--bg-toolbar);
+  padding: 0 12px;
+  background: var(--bg-shell);
   border-top: 1px solid var(--border);
-  font-size: var(--fs-small);
-  color: var(--text-muted);
+  font-size: calc(var(--fs-small) - 1px);
+  color: var(--text-dim);
   flex: none;
 }
 
@@ -56,12 +54,8 @@ const changes = computed(() => props.status?.files?.length ?? 0)
   max-width: 40%;
 }
 
-.sep {
-  color: var(--text-dim);
-}
-
 .loading {
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .dirty {

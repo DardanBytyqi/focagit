@@ -63,20 +63,31 @@ function markClass(f: git.FileStatus, staged: boolean): string {
         class="chevron"
         :class="{ closed: !expanded.has(n.path) }"
         @click.stop="emit('toggleDir', n.path)"
-        >▾</span
-      >
+        ><svg viewBox="0 0 12 12"><path d="M3 4.5L6 7.5 9 4.5" /></svg
+      ></span>
       <span class="name">{{ n.name }}</span>
       <span class="actions">
-        <button class="tiny" :disabled="busy" @click.stop="emit('action', n)">
-          {{ staged ? '−' : '+' }}
+        <button
+          class="tiny"
+          :title="staged ? 'Unstage' : 'Stage'"
+          :disabled="busy"
+          @click.stop="emit('action', n)"
+        >
+          <template v-if="staged"
+            ><svg class="glyph" viewBox="0 0 12 12"><path d="M2.5 6h7" /></svg
+          ></template>
+          <template v-else
+            ><svg class="glyph" viewBox="0 0 12 12"><path d="M6 2.5v7M2.5 6h7" /></svg
+          ></template>
         </button>
         <button
           v-if="!staged"
           class="tiny danger"
           :disabled="busy"
+          title="Discard changes"
           @click.stop="emit('discard', n)"
         >
-          ✕
+          <svg class="glyph" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" /></svg>
         </button>
       </span>
     </div>
@@ -106,16 +117,27 @@ function markClass(f: git.FileStatus, staged: boolean): string {
       <span class="mark" :class="markClass(n.file, staged)">{{ mark(n.file, staged) }}</span>
       <span class="name" :title="n.path">{{ n.name }}</span>
       <span class="actions">
-        <button class="tiny" :disabled="busy" @click.stop="emit('action', n)">
-          {{ staged ? '−' : '+' }}
+        <button
+          class="tiny"
+          :title="staged ? 'Unstage' : 'Stage'"
+          :disabled="busy"
+          @click.stop="emit('action', n)"
+        >
+          <template v-if="staged"
+            ><svg class="glyph" viewBox="0 0 12 12"><path d="M2.5 6h7" /></svg
+          ></template>
+          <template v-else
+            ><svg class="glyph" viewBox="0 0 12 12"><path d="M6 2.5v7M2.5 6h7" /></svg
+          ></template>
         </button>
         <button
           v-if="!staged"
           class="tiny danger"
           :disabled="busy"
+          title="Discard changes"
           @click.stop="emit('discard', n)"
         >
-          ✕
+          <svg class="glyph" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" /></svg>
         </button>
       </span>
     </div>
@@ -126,9 +148,10 @@ function markClass(f: git.FileStatus, staged: boolean): string {
 .row {
   display: flex;
   align-items: center;
-  gap: 5px;
-  height: 21px;
-  padding-right: 6px;
+  gap: 6px;
+  height: 28px;
+  padding-right: 8px;
+  border-radius: var(--radius-sm);
   font-size: var(--fs-small);
   white-space: nowrap;
   overflow: hidden;
@@ -140,16 +163,27 @@ function markClass(f: git.FileStatus, staged: boolean): string {
 }
 
 .row.selected {
-  background: var(--bg-selected);
+  background: var(--accent-soft);
 }
 
 .chevron {
-  font-size: 9px;
-  width: 11px;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
   flex: none;
-  text-align: center;
   color: var(--text-muted);
   transition: transform 0.1s ease;
+}
+
+.chevron svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .chevron:hover {
@@ -189,7 +223,7 @@ function markClass(f: git.FileStatus, staged: boolean): string {
 }
 
 .m-move {
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .m-conflict {
@@ -217,11 +251,30 @@ function markClass(f: git.FileStatus, staged: boolean): string {
   display: flex;
 }
 
+/* Drawn glyphs: + − × as characters sit off-centre and change with the font. */
 .tiny {
-  padding: 0 6px;
-  font-size: 11px;
-  line-height: 15px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--text-muted);
+  background: var(--bg-raised);
   border-color: var(--border-strong);
+}
+
+.tiny:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.glyph {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
 }
 
 .tiny.danger:hover:not(:disabled) {

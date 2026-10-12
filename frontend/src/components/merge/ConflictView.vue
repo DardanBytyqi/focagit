@@ -28,9 +28,7 @@ const rebase = computed(() => state.status?.rebase ?? null)
 
 const op = computed(() => state.status?.operation ?? '')
 
-// The sides are named after what they are, never "mine" and "theirs": in a
-// rebase git's "ours" is what the commit is being replayed on, and "theirs" is
-// the user's own commit, so either word would point at the wrong side.
+// Sides are named after what they are: in a rebase "mine" and "theirs" point the wrong way.
 const mine = computed(() => rebase.value?.onto || state.status?.head || 'HEAD')
 // Go labels a commit "<short hash> <subject>"; here only the subject means anything.
 const theirs = computed(() => {
@@ -80,11 +78,7 @@ async function select(next: string) {
 /** True while a rebase is being moved on to its next commit. */
 const continuing = ref(false)
 
-/**
- * A rebase stops once per conflicting commit. Having resolved one, there is
- * nothing left to decide before the next, so it carries on by itself and the
- * window stays open if the next commit conflicts too.
- */
+/** Once a commit's conflicts are resolved the rebase carries on, staying open for the next ones. */
 async function continueRebase() {
   continuing.value = true
   const ok = await finishOperation('')

@@ -81,9 +81,7 @@ func (r *Repo) Rebase(ctx context.Context, opts RebaseOptions) (RebaseResult, er
 	return RebaseResult{Kind: kind, Conflicts: []string{}, Head: head}, nil
 }
 
-// rebaseDir is the directory an open rebase keeps its state in, empty when
-// there is none. The two backends use different ones, and rebase-apply is
-// shared with git am, which leaves no "rebasing" marker in it.
+// rebaseDir is where an open rebase keeps its state, for either backend; empty when none is open.
 func (r *Repo) rebaseDir() string {
 	merge := filepath.Join(r.gitDir, "rebase-merge")
 	if _, err := os.Stat(merge); err == nil {

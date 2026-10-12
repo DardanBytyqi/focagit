@@ -1,48 +1,56 @@
-/* Design tokens. A theme redefines this block, never hunts colours. */
+/* Design tokens: a theme redefines this block, never hunts colours. */
 :root {
-  --bg: #1e1f22;
-  --bg-raised: #26282c;
-  --bg-toolbar: #2b2d31;
-  --bg-hover: #313439;
-  --bg-selected: #2d4f7c;
-  --border: #3a3d42;
-  --border-strong: #4a4e55;
+  --bg: #1d1e21;
+  --bg-shell: #161719;
+  --bg-toolbar: #161719;
+  --bg-raised: #232428;
+  --bg-hover: #2a2b30;
+  --bg-selected: #313238;
+  --border: #2c2d32;
+  --border-strong: #3d3f45;
 
-  --text: #d7d9dd;
-  --text-muted: #8b9096;
-  --text-dim: #6b7076;
+  --text: #e6e6e8;
+  --text-muted: #a0a1a8;
+  --text-dim: #6e7078;
 
-  --accent: #4a8cf7;
-  --green: #6cc26c;
-  --red: #e06c6c;
-  --amber: #d9a441;
-  --purple: #b07cd6;
+  /* Neutral on purpose: the graph is the only colourful thing in the window. */
+  --accent: #d9dade;
+  --accent-soft: rgb(255 255 255 / 0.07);
+  --blue: #6f9cf0;
+  --green: #5fbf85;
+  --red: #ec7a72;
+  --amber: #ddb25f;
+  --purple: #b493e8;
 
-  /* Graph lanes: eight, because internal/graph uses eight. */
-  --lane-0: #4a8cf7;
-  --lane-1: #6cc26c;
-  --lane-2: #d9a441;
-  --lane-3: #b07cd6;
-  --lane-4: #e06c6c;
-  --lane-5: #46b8b0;
-  --lane-6: #d67ca8;
-  --lane-7: #9aa0a6;
+  /* Eight lanes like internal/graph, at one lightness so no branch shouts. */
+  --lane-0: #6f9cf0;
+  --lane-1: #5fbf85;
+  --lane-2: #ddb25f;
+  --lane-3: #b493e8;
+  --lane-4: #ec7a72;
+  --lane-5: #4fbcc4;
+  --lane-6: #e58bbd;
+  --lane-7: #9ea3ad;
 
   /* The two sides of a conflict. Not green and red: those mean added and removed. */
-  --mine: #46b8b0;
-  --theirs: #b07cd6;
+  --mine: #4fbcc4;
+  --theirs: #b493e8;
 
   --shadow: rgb(0 0 0 / 0.45);
-  --scrim: rgb(0 0 0 / 0.5);
+  --scrim: rgb(0 0 0 / 0.55);
 
-  --sidebar-width: 240px;
-  --toolbar-height: 40px;
-  --statusbar-height: 24px;
+  --sidebar-width: 248px;
+  --toolbar-height: 46px;
+  --statusbar-height: 26px;
 
-  --font: -apple-system, "Segoe UI", "Cantarell", "Noto Sans", sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "Noto Sans Mono", monospace;
-  --fs: 13px;
-  --fs-small: 12px;
+  --radius-sm: 4px;
+  --radius: 5px;
+  --radius-lg: 8px;
+
+  --font: 'Red Hat Text Variable', system-ui, sans-serif;
+  --font-mono: 'Red Hat Mono Variable', monospace;
+  --fs: 14px;
+  --fs-small: 13px;
 
   /* Stacking layers: anything that overlaps picks one of these. */
   --z-sticky: 1;
@@ -52,40 +60,42 @@
 }
 
 /* The light theme. Only colours change: sizes are the same choice either way. */
-:root[data-theme="light"] {
+:root[data-theme='light'] {
   --bg: #ffffff;
-  --bg-raised: #eef1f5;
-  --bg-toolbar: #e2e7ee;
-  --bg-hover: #d8dfe8;
-  --bg-selected: #c4d8f6;
-  --border: #c1c9d3;
-  --border-strong: #98a2af;
+  --bg-shell: #f4f4f5;
+  --bg-toolbar: #f4f4f5;
+  --bg-raised: #f8f8f9;
+  --bg-hover: #ececee;
+  --bg-selected: #e2e3e6;
+  --border: #e3e3e6;
+  --border-strong: #cbccd1;
 
-  --text: #1f2328;
-  --text-muted: #5c6570;
-  --text-dim: #868f99;
+  --text: #1d1e21;
+  --text-muted: #5d5f66;
+  --text-dim: #8c8e95;
 
-  /* Darker than the dark theme's: the same hue on white would not read. */
-  --accent: #1f6feb;
-  --green: #217a3a;
-  --red: #bf2f28;
-  --amber: #8a5a00;
-  --purple: #7743c9;
+  --accent: #2a2b30;
+  --accent-soft: rgb(0 0 0 / 0.06);
+  --blue: #2f64c8;
+  --green: #1f8650;
+  --red: #c8423a;
+  --amber: #a46a00;
+  --purple: #7448c8;
 
-  --lane-0: #1f6feb;
-  --lane-1: #217a3a;
-  --lane-2: #a06400;
-  --lane-3: #7743c9;
-  --lane-4: #bf2f28;
-  --lane-5: #0f7f78;
-  --lane-6: #b1417c;
-  --lane-7: #5d666f;
+  --lane-0: #2f64c8;
+  --lane-1: #1f8650;
+  --lane-2: #b07400;
+  --lane-3: #7448c8;
+  --lane-4: #c8423a;
+  --lane-5: #0b8690;
+  --lane-6: #b8457f;
+  --lane-7: #646b78;
 
-  --mine: #0f7f78;
-  --theirs: #7743c9;
+  --mine: #0b8690;
+  --theirs: #7448c8;
 
-  --shadow: rgb(0 0 0 / 0.16);
-  --scrim: rgb(0 0 0 / 0.35);
+  --shadow: rgb(0 0 0 / 0.14);
+  --scrim: rgb(0 0 0 / 0.3);
 }
 
 * {
@@ -108,6 +118,8 @@ body {
   /* The webview is the whole window; a text cursor over chrome looks broken. */
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  /* Tabular figures, so counts and dates do not jitter. */
+  font-variant-numeric: tabular-nums;
 }
 
 button {
@@ -115,14 +127,41 @@ button {
   color: inherit;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 4px 10px;
   cursor: pointer;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease,
+    color 0.1s ease;
 }
 
 button:hover:not(:disabled) {
   background: var(--bg-hover);
+}
+
+button:focus-visible {
+  outline: 1px solid var(--text-muted);
+  outline-offset: 1px;
+}
+
+/* The one action a view exists for. Everything else stays quiet next to it. */
+button.primary {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--text-muted);
+  border-color: var(--text-muted);
+}
+
+button.primary:disabled {
+  background: var(--bg-hover);
   border-color: var(--border);
+  color: var(--text-dim);
 }
 
 button:disabled {
@@ -132,8 +171,8 @@ button:disabled {
 
 /* Scrollbars: the default GTK webview ones are far too heavy for a dense UI. */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
 }
 
 ::-webkit-scrollbar-track {
@@ -143,7 +182,17 @@ button:disabled {
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border-radius: 5px;
-  border: 2px solid var(--bg);
+  /* Transparent, so the gap around the thumb works on any surface. */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Firefox has no ::-webkit-scrollbar; only the dev preview runs there. */
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -152,18 +201,18 @@ button:disabled {
 
 /* Menus are teleported to the body, so their styling cannot be scoped. */
 .menu {
-  min-width: 190px;
-  padding: 4px;
+  min-width: 200px;
+  padding: 5px;
   background: var(--bg-raised);
   border: 1px solid var(--border-strong);
-  border-radius: 5px;
-  box-shadow: 0 8px 24px var(--shadow);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px var(--shadow);
   z-index: var(--z-menu);
 }
 
 .menu-item {
-  padding: 5px 10px;
-  border-radius: 3px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
   font-size: var(--fs-small);
   cursor: default;
   outline: none;
@@ -184,13 +233,14 @@ button:disabled {
 
 .menu-sep {
   height: 1px;
-  margin: 4px 6px;
+  margin: 5px 6px;
   background: var(--border);
 }
 
+/* Mono runs wide next to the sans, so it steps down a notch to match. */
 .mono {
   font-family: var(--font-mono);
-  font-size: var(--fs-small);
+  font-size: calc(var(--fs-small) - 1px);
 }
 
 .muted {
@@ -205,7 +255,7 @@ button:disabled {
   padding: 3px 9px;
   background: var(--bg-selected);
   border: 1px solid var(--accent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--text);
   font: var(--fs) var(--font);
   white-space: nowrap;
@@ -217,13 +267,9 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 10px;
+  min-width: 14px;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
   font-weight: 600;
   /* Digits of one width: the pill stops twitching as the count changes. */
   font-variant-numeric: tabular-nums;

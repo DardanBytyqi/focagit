@@ -130,19 +130,28 @@ function toggle(key: string) {
         :class="{ active: mode === 'changes' }"
         @click="emit('mode', 'changes')"
       >
-        <span class="nav-icon">◧</span>
+        <svg class="nav-icon" viewBox="0 0 16 16">
+          <path d="M3 2.5h7l3 3v8H3z" />
+          <path d="M8 6.5v4M6 8.5h4" />
+        </svg>
         <span>Changes</span>
         <span v-if="changeCount" class="pill">{{ changeCount }}</span>
       </div>
       <div class="nav-item" :class="{ active: mode === 'commit' }" @click="emit('mode', 'commit')">
-        <span class="nav-icon">≡</span>
+        <svg class="nav-icon" viewBox="0 0 16 16">
+          <circle cx="5" cy="3.5" r="1.5" />
+          <circle cx="5" cy="12.5" r="1.5" />
+          <path d="M5 5v6M9 3.5h4.5M9 8h4.5M9 12.5h4.5" />
+        </svg>
         <span>All Commits</span>
       </div>
     </nav>
 
     <div v-for="s in sections" :key="s.key" class="section">
       <div class="section-header" @click="toggle(s.key)">
-        <span class="chevron" :class="{ closed: collapsed[s.key] }">▾</span>
+        <span class="chevron" :class="{ closed: collapsed[s.key] }"
+          ><svg viewBox="0 0 12 12"><path d="M3 4.5L6 7.5 9 4.5" /></svg
+        ></span>
         {{ s.title }}
         <span class="count muted">{{ s.refs.length }}</span>
         <button
@@ -226,7 +235,9 @@ function toggle(key: string) {
 
     <div class="section">
       <div class="section-header" @click="toggle('tag')">
-        <span class="chevron" :class="{ closed: collapsed.tag }">▾</span>
+        <span class="chevron" :class="{ closed: collapsed.tag }"
+          ><svg viewBox="0 0 12 12"><path d="M3 4.5L6 7.5 9 4.5" /></svg
+        ></span>
         Tags
         <span class="count muted">{{ tags.length }}</span>
       </div>
@@ -271,7 +282,9 @@ function toggle(key: string) {
 
     <div class="section">
       <div class="section-header" @click="toggle('stash')">
-        <span class="chevron" :class="{ closed: collapsed.stash }">▾</span>
+        <span class="chevron" :class="{ closed: collapsed.stash }"
+          ><svg viewBox="0 0 12 12"><path d="M3 4.5L6 7.5 9 4.5" /></svg
+        ></span>
         Stashes
         <span class="count muted">{{ stashes.length }}</span>
       </div>
@@ -309,63 +322,86 @@ function toggle(key: string) {
 
 <style scoped>
 .nav {
-  padding: 4px 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 8px 10px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 7px;
-  height: 24px;
+  gap: 9px;
+  height: 30px;
   padding: 0 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
   cursor: default;
 }
 
 .nav-item:hover {
   background: var(--bg-hover);
+  color: var(--text);
 }
 
 .nav-item.active {
   background: var(--bg-selected);
+  color: var(--text);
+  font-weight: 500;
 }
 
 .nav-icon {
-  width: 12px;
-  text-align: center;
-  color: var(--text-muted);
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  color: var(--text-dim);
 }
 
-/* Pushed to the right edge, and amber: uncommitted work is waiting, not new. */
+.nav-item.active .nav-icon {
+  color: var(--text);
+}
+
+/* Amber: uncommitted work is waiting, not new. */
 .pill {
   margin-left: auto;
-  background: var(--amber);
-  color: var(--bg);
+  color: var(--amber);
 }
 
 .sidebar {
   width: var(--sidebar-width);
-  background: var(--bg-raised);
+  background: var(--bg-shell);
   border-right: 1px solid var(--border);
   overflow-y: auto;
-  padding: 6px 0;
+  padding: 8px 0;
   flex: none;
 }
 
 .section {
-  margin-bottom: 10px;
+  margin-bottom: 14px;
+  padding: 0 8px;
 }
 
 .section-header {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  font-size: var(--fs-small);
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: calc(var(--fs-small) - 1px);
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-dim);
   cursor: default;
+}
+
+.section-header:hover {
+  color: var(--text-muted);
 }
 
 /* The same colours the graph uses, so a kind looks the same everywhere. */
@@ -378,22 +414,44 @@ function toggle(key: string) {
 }
 
 /* Pushed to the right edge, and only there when the pointer is. */
+/* The + replaces the count on hover, so every section's count lines up on the right. */
 .section-header .add {
+  display: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
   margin-left: auto;
-  padding: 0 5px;
+  padding: 0;
   line-height: 1;
-  color: var(--text-dim);
-  visibility: hidden;
+  color: var(--text-muted);
 }
 
 .section-header:hover .add {
-  visibility: visible;
+  display: grid;
 }
 
+.section-header:has(.add):hover .count {
+  display: none;
+}
+
+/* Drawn, not a ▾ glyph, which sits on the baseline and never lines up with the label. */
 .chevron {
-  display: inline-block;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  flex: none;
   transition: transform 0.12s ease;
-  font-size: 10px;
+}
+
+.chevron svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .chevron.closed {
@@ -402,15 +460,16 @@ function toggle(key: string) {
 
 .count {
   margin-left: auto;
-  font-weight: 400;
+  font-weight: 500;
 }
 
 .ref {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 2px 10px 2px 22px;
-  height: 22px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 24px;
+  height: 28px;
+  border-radius: var(--radius-sm);
   cursor: default;
   overflow: hidden;
   white-space: nowrap;
@@ -439,7 +498,12 @@ function toggle(key: string) {
 
 .ref.head .ref-name {
   font-weight: 600;
-  color: var(--green);
+  color: var(--text);
+}
+
+/* The checked-out branch: a dot in its colour, where the others have nothing. */
+.ref.head {
+  background: var(--bg-hover);
 }
 
 /* The name wins the space: a long upstream would push it out of the row. */
@@ -456,12 +520,13 @@ function toggle(key: string) {
   max-width: 45%;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 11px;
+  font-size: calc(var(--fs-small) - 2px);
+  color: var(--text-dim);
 }
 
 .empty {
-  padding: 2px 10px 2px 26px;
+  padding: 2px 8px 2px 24px;
   font-size: var(--fs-small);
-  font-style: italic;
+  color: var(--text-dim);
 }
 </style>

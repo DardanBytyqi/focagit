@@ -22,6 +22,8 @@ const props = defineProps<{
   refsByHash: Map<string, git.Ref[]>
   /** The branch a reset would move; empty when HEAD is detached. */
   head: string
+  /** The commit HEAD points at, branch or not, which the graph rings. */
+  headHash: string
   /** A commit to scroll to and select; the nonce lets the same one be asked twice. */
   reveal: { hash: string; nonce: number } | null
 }>()
@@ -38,12 +40,12 @@ const emit = defineEmits<{
 }>()
 
 /** Virtualised list. */
-const ROW = 24
+const ROW = 30
 const OVERSCAN = 12
 const PAGE = 200
 
 /** Graph geometry. Lanes are evenly spaced; the dot sits at the row's middle. */
-const LANE_W = 13
+const LANE_W = 15
 const MID = ROW / 2
 // The column is sized for the widest point of the whole history.
 const MAX_LANES = 10
@@ -324,9 +326,9 @@ onBeforeUnmount(() => {
     <div class="header">
       <span></span>
       <span>Description</span>
-      <span>Author</span>
-      <span>Date</span>
-      <span>Commit</span>
+      <span class="col-author">Author</span>
+      <span class="col-date">Date</span>
+      <span class="col-hash">Commit</span>
     </div>
 
     <div ref="viewport" class="viewport" @scroll.passive="onScroll">
@@ -340,7 +342,10 @@ onBeforeUnmount(() => {
                 match: matchRows.has(row.index),
                 'match-current': matches[current] === row.index,
               }"
-              :style="{ transform: `translateY(${row.index * ROW}px)` }"
+              :style="{
+                transform: `translateY(${row.index * ROW}px)`,
+                '--lane': row.entry ? laneColor(row.entry.graph.color) : undefined,
+              }"
               @click="row.entry && select(row.entry)"
             >
               <template v-if="row.entry">
@@ -364,10 +369,21 @@ onBeforeUnmount(() => {
                     :d="outPath(row.entry.graph.lane, l.lane)"
                     :stroke="laneColor(l.color)"
                   />
+                  <!-- Where you are: a ring around the dot, as Fork draws it. -->
+                  <circle
+                    v-if="row.entry.commit.hash === headHash"
+                    class="head-ring"
+                    :cx="x(row.entry.graph.lane)"
+                    :cy="MID"
+                    r="7.5"
+                    fill="none"
+                    :stroke="laneColor(row.entry.graph.color)"
+                    stroke-width="1.5"
+                  />
                   <circle
                     :cx="x(row.entry.graph.lane)"
                     :cy="MID"
-                    :r="row.entry.graph.merge ? 3.2 : 3.8"
+                    :r="row.entry.graph.merge ? 3.6 : 4.2"
                     :fill="row.entry.graph.merge ? 'var(--bg)' : laneColor(row.entry.graph.color)"
                     :stroke="laneColor(row.entry.graph.color)"
                     stroke-width="2"
@@ -379,12 +395,9 @@ onBeforeUnmount(() => {
                     v-for="r in props.refsByHash.get(row.entry.commit.hash) ?? []"
                     :key="r.name"
                     class="badge"
-                    :class="r.kind"
+                    :class="[r.kind, { current: r.head }]"
                   >
-                    <!-- The checked out branch shows a tick where the others show their kind. -->
-                    <span v-if="r.head" class="head">✓</span>
                     <RefIcon
-                      v-else
                       :kind="r.kind === 'remote' ? 'remote' : r.kind === 'tag' ? 'tag' : 'branch'"
                     />
                     {{ r.short }}
@@ -466,18 +479,20 @@ onBeforeUnmount(() => {
 .header,
 .row {
   display: grid;
-  grid-template-columns: var(--graph-w) 1fr 140px 110px 70px;
+  /* Each column a similar margin wider than its value, in em, so they sit evenly spaced. */
+  grid-template-columns: var(--graph-w) 1fr 9em 11.5em 6em;
   align-items: center;
-  gap: 8px;
-  padding: 0 10px;
+  gap: 10px;
+  padding: 0 14px;
 }
 
 .header {
-  height: 26px;
+  height: 32px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-raised);
-  color: var(--text-muted);
-  font-size: var(--fs-small);
+  background: var(--bg);
+  color: var(--text-dim);
+  font-size: calc(var(--fs-small) - 1px);
+  font-weight: 500;
   flex: none;
 }
 
@@ -497,43 +512,47 @@ onBeforeUnmount(() => {
   top: 0;
   left: 0;
   right: 0;
-  height: 24px;
+  height: 30px;
   white-space: nowrap;
   cursor: default;
 }
 
 .row:hover {
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--bg-hover) 70%, transparent);
 }
 
+/* The selected row's edge takes its branch's colour, tying the row to the graph. */
 .row.selected {
   background: var(--bg-selected);
+  box-shadow: inset 3px 0 0 var(--lane, var(--text-muted));
 }
 
 .row.match {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
 }
 
 .row.match-current {
-  background: color-mix(in srgb, var(--accent) 42%, transparent);
+  background: color-mix(in srgb, var(--amber) 30%, transparent);
 }
 
 .find {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--border);
 }
 
 .find-input {
   flex: 1;
   min-width: 0;
-  padding: 3px 6px;
+  height: 30px;
+  padding: 0 10px;
   color: inherit;
-  background: var(--bg-hover);
+  font: inherit;
+  background: var(--bg-shell);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: none;
 }
 
@@ -552,7 +571,7 @@ onBeforeUnmount(() => {
   cursor: default;
   background: none;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .find-btn:hover:not(:disabled) {
@@ -564,16 +583,22 @@ onBeforeUnmount(() => {
 }
 
 /* The lines are drawn open; only the dot is filled. */
+/* The ring around HEAD on the first lane reaches past the column's left edge. */
+.graph {
+  overflow: visible;
+}
+
 .graph path {
   fill: none;
-  stroke-width: 1.6;
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 
 /* Flex, so the badges sit centred against the subject instead of on its baseline. */
 .col-subject {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   min-width: 0;
   overflow: hidden;
 }
@@ -589,53 +614,56 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: var(--fs-small);
+  color: var(--text-muted);
 }
 
-/* The glyph says which kind it is, the colour says it from further away. */
+.col-hash {
+  color: var(--text-dim);
+}
+
+/* The values read as columns only when they line up in the middle. */
+.col-author,
+.col-date,
+.col-hash {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Refs drawn in their commit's lane colour: solid local, dashed remote, filled when checked out. */
 .badge {
   display: inline-flex;
   align-items: center;
   flex: none;
   gap: 5px;
-  height: 18px;
-  padding: 0 9px;
+  height: 19px;
+  padding: 0 7px 0 6px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: calc(var(--fs-small) - 1px);
+  font-weight: 600;
   line-height: 1;
-  background: var(--bg);
-  border: 1px solid var(--border-strong);
   color: var(--text);
+  border: 1px solid var(--lane);
 }
 
 .badge .ref-icon {
   width: 11px;
   height: 11px;
+  color: var(--lane);
 }
 
-/* The colour is on the border and the glyph; the name stays as readable as the subject. */
-.badge.branch {
-  border-color: var(--green);
-}
-
-.badge.branch .ref-icon {
-  color: var(--green);
-}
-
-.badge.tag {
-  border-color: var(--amber);
-}
-
-.badge.tag .ref-icon {
-  color: var(--amber);
-}
-
-.badge.remote .ref-icon {
+.badge.remote {
+  border-style: dashed;
   color: var(--text-muted);
+  font-weight: 500;
 }
 
-.badge .head {
-  color: var(--green);
-  font-weight: 700;
+.badge.current {
+  background: var(--lane);
+  color: var(--bg);
+}
+
+.badge.current .ref-icon {
+  color: var(--bg);
 }
 
 .placeholder {

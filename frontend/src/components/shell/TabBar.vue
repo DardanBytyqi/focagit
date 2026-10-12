@@ -65,9 +65,10 @@ const emit = defineEmits<{
   align-items: flex-end;
   gap: 2px;
   flex: none;
-  padding: 5px 6px 0;
+  padding: 6px 8px 0;
   overflow-x: auto;
-  background: var(--bg);
+  background: var(--bg-shell);
+  border-bottom: 1px solid var(--border);
   scrollbar-width: none;
 }
 
@@ -82,12 +83,14 @@ const emit = defineEmits<{
   flex: none;
   min-width: 96px;
   max-width: 190px;
-  height: 28px;
-  padding: 0 7px 0 11px;
+  height: 32px;
+  padding: 0 8px 0 13px;
   color: var(--text-dim);
-  font-size: var(--fs);
+  font-size: var(--fs-small);
   cursor: default;
-  border-radius: 7px 7px 0 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+  /* Down over the strip's bottom border, so the active tab opens into the view. */
+  margin-bottom: -1px;
   /* Transparent, so only the active tab carries the toolbar's colour. */
   background: transparent;
   transition: background 0.12s ease;
@@ -101,8 +104,12 @@ const emit = defineEmits<{
 /* The active tab takes the toolbar's background, so the two read as one surface. */
 .tab.active {
   color: var(--text);
-  background: var(--bg-toolbar);
-  box-shadow: inset 0 2px 0 var(--accent);
+  font-weight: 500;
+  background: var(--bg);
+  box-shadow:
+    inset 1px 0 0 var(--border),
+    inset -1px 0 0 var(--border),
+    inset 0 1px 0 var(--border);
 }
 
 .name {

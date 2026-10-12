@@ -298,11 +298,21 @@ watch(
           <button
             class="tiny"
             :disabled="!selectedPaths(false).length || busy"
+            title="Stage the selected file"
             @click="applySelected(false)"
           >
+            <svg class="arrow" viewBox="0 0 16 16"><path d="M8 3v9.5M4.5 9L8 12.5 11.5 9" /></svg>
             Stage
           </button>
-          <button class="tiny ghost" :disabled="!unstaged.length || busy" @click="stageAll">
+          <button
+            class="tiny ghost"
+            :disabled="!unstaged.length || busy"
+            title="Stage every file"
+            @click="stageAll"
+          >
+            <svg class="arrow" viewBox="0 0 16 16">
+              <path d="M4.5 3.5L8 7l3.5-3.5M4.5 8.5L8 12l3.5-3.5" />
+            </svg>
             All
           </button>
         </div>
@@ -331,11 +341,23 @@ watch(
           <button
             class="tiny"
             :disabled="!selectedPaths(true).length || busy"
+            title="Unstage the selected file"
             @click="applySelected(true)"
           >
+            <svg class="arrow up" viewBox="0 0 16 16">
+              <path d="M8 3v9.5M4.5 9L8 12.5 11.5 9" />
+            </svg>
             Unstage
           </button>
-          <button class="tiny ghost" :disabled="!staged.length || busy" @click="unstageAll">
+          <button
+            class="tiny ghost"
+            :disabled="!staged.length || busy"
+            title="Unstage every file"
+            @click="unstageAll"
+          >
+            <svg class="arrow up" viewBox="0 0 16 16">
+              <path d="M4.5 3.5L8 7l3.5-3.5M4.5 8.5L8 12l3.5-3.5" />
+            </svg>
             All
           </button>
         </div>
@@ -425,15 +447,16 @@ watch(
   flex: 1;
   height: 100%;
   min-height: 0;
-  background: var(--bg-raised);
+  background: var(--bg);
 }
 
 .files {
-  width: 300px;
+  width: 320px;
   flex: none;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  background: var(--bg-shell);
 }
 
 .pane {
@@ -447,19 +470,21 @@ watch(
 .pane-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  background: var(--bg-toolbar);
-  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  height: 40px;
+  padding: 0 8px 0 14px;
   flex: none;
 }
 
 .title {
   font-weight: 600;
+  font-size: var(--fs-small);
 }
 
 .count {
   font-size: var(--fs-small);
+  font-weight: 600;
+  color: var(--text-dim);
 }
 
 .spacer {
@@ -470,26 +495,58 @@ watch(
   flex: 1;
   overflow: auto;
   min-height: 0;
-  padding: 2px 0;
+  padding: 0 6px 6px;
 }
 
 .empty {
-  padding: 4px 12px;
+  padding: 4px 14px;
   font-size: var(--fs-small);
-  font-style: italic;
+  color: var(--text-dim);
 }
 
 .tiny {
-  padding: 1px 10px;
-  font-size: var(--fs-small);
-  border-color: var(--border-strong);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px 0 7px;
+  font-size: calc(var(--fs-small) - 1px);
+  font-weight: 500;
+  background: var(--bg-hover);
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.tiny:hover:not(:disabled) {
+  background: var(--border-strong);
+}
+
+/* One arrow moves one file, two move them all; down into Staged, up out of it. */
+.arrow {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.arrow.up {
+  transform: rotate(180deg);
 }
 
 /* "All" is the blunt instrument; it should not look like the default. */
 .tiny.ghost {
-  padding: 1px 7px;
+  padding: 0 8px;
   color: var(--text-muted);
+  background: none;
   border-color: transparent;
+}
+
+.tiny.ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
 }
 
 .splitv {
@@ -509,10 +566,9 @@ watch(
 .diff-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 26px;
-  padding: 0 10px;
-  background: var(--bg-toolbar);
+  gap: 10px;
+  height: 40px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--border);
   font-size: var(--fs-small);
   flex: none;
@@ -538,20 +594,23 @@ watch(
 
 .commit-box {
   flex: none;
-  padding: 8px 10px;
+  padding: 12px 14px;
   border-top: 1px solid var(--border);
-  background: var(--bg-raised);
+  background: var(--bg-shell);
 }
 
 .message {
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: var(--bg);
   overflow: hidden;
+  transition:
+    border-color 0.1s ease,
+    box-shadow 0.1s ease;
 }
 
 .message:focus-within {
-  border-color: var(--accent);
+  border-color: var(--text-dim);
 }
 
 .summary-row {
@@ -566,9 +625,19 @@ watch(
   border: none;
   color: var(--text);
   font: inherit;
-  padding: 5px 8px;
+  padding: 8px 12px;
   outline: none;
   width: 100%;
+}
+
+.summary {
+  font-weight: 500;
+}
+
+.summary::placeholder,
+.description::placeholder {
+  color: var(--text-dim);
+  font-weight: 400;
 }
 
 .counter {
@@ -582,10 +651,9 @@ watch(
 }
 
 .description {
-  height: 52px;
+  height: 64px;
   resize: none;
   display: block;
-  font-family: var(--font-mono);
   font-size: var(--fs-small);
 }
 
@@ -593,7 +661,7 @@ watch(
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .amend {
@@ -601,15 +669,7 @@ watch(
 }
 
 .primary {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-  padding: 5px 14px;
-}
-
-.primary:disabled {
-  background: var(--bg-hover);
-  border-color: var(--border);
-  color: var(--text-dim);
+  height: 34px;
+  padding: 0 18px;
 }
 </style>

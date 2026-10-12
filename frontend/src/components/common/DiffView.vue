@@ -108,26 +108,30 @@ function sign(kind: string): string {
 
     <div v-else-if="!diff.hunks?.length" class="notice muted">no changes in this file</div>
 
-    <template v-else>
+    <!-- As wide as the longest line, so backgrounds and headers reach the end when scrolled. -->
+    <div v-else class="sheet">
       <div v-for="b in blocks" :key="b.index" class="hunk" :class="{ armed: selectable }">
-        <div class="hunk-header">
-          <span class="range"
-            >@@ -{{ b.hunk.oldStart }},{{ b.hunk.oldLines }} +{{ b.hunk.newStart }},{{
-              b.hunk.newLines
-            }}
-            @@</span
-          >
-          <span v-if="b.hunk.header" class="heading">{{ b.hunk.header }}</span>
+        <!-- Pinned to the visible edge so the buttons stay in reach when scrolled sideways. -->
+        <div v-if="selectable" class="hunk-float">
+          <div class="hunk-actions">
+            <button class="tiny" @click="selectHunk(b)">Select</button>
+            <button class="tiny" @click="emit('hunk', b.index)">{{ hunkAction }}</button>
+            <button v-if="discardable" class="tiny danger" @click="emit('discardHunk', b.index)">
+              Discard
+            </button>
+          </div>
         </div>
 
-        <!-- Floating over the hunk under the cursor rather than sitting in the
-             header: the action belongs to the block you are looking at. -->
-        <div v-if="selectable" class="hunk-actions">
-          <button class="tiny" @click="selectHunk(b)">Select</button>
-          <button class="tiny" @click="emit('hunk', b.index)">{{ hunkAction }}</button>
-          <button v-if="discardable" class="tiny danger" @click="emit('discardHunk', b.index)">
-            Discard
-          </button>
+        <div class="hunk-header">
+          <div class="hunk-title">
+            <span class="range"
+              >@@ -{{ b.hunk.oldStart }},{{ b.hunk.oldLines }} +{{ b.hunk.newStart }},{{
+                b.hunk.newLines
+              }}
+              @@</span
+            >
+            <span v-if="b.hunk.header" class="heading">{{ b.hunk.header }}</span>
+          </div>
         </div>
 
         <div
@@ -158,7 +162,7 @@ function sign(kind: string): string {
       <div v-if="diff.truncated" class="notice muted">
         patch truncated — the file is too large to display in full
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -167,15 +171,22 @@ function sign(kind: string): string {
   height: 100%;
   overflow: auto;
   font-family: var(--font-mono);
-  font-size: var(--fs-small);
-  line-height: 1.45;
+  font-size: calc(var(--fs-small) - 1px);
+  line-height: 1.6;
   user-select: text;
+  /* Lets pinned parts size themselves to the visible width with cqw. */
+  container-type: inline-size;
+}
+
+.sheet {
+  width: max-content;
+  min-width: 100%;
 }
 
 .notice {
-  padding: 10px 12px;
+  padding: 12px 16px;
   font-family: var(--font);
-  font-style: italic;
+  color: var(--text-dim);
 }
 
 .hunk {
@@ -185,6 +196,14 @@ function sign(kind: string): string {
 .hunk.armed:hover {
   outline: 1px solid var(--accent);
   outline-offset: -1px;
+}
+
+.hunk-float {
+  position: sticky;
+  left: 0;
+  width: 100cqw;
+  height: 0;
+  z-index: var(--z-float);
 }
 
 .hunk-actions {
@@ -212,19 +231,36 @@ function sign(kind: string): string {
 }
 
 .hunk-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 2px 10px;
-  background: var(--bg-toolbar);
+  background: var(--bg-shell);
   color: var(--text-dim);
   border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
 }
 
+/* The header text stays in view and on one line whatever the horizontal scroll. */
+.hunk-title {
+  position: sticky;
+  left: 0;
+  box-sizing: border-box;
+  max-width: 100cqw;
+  display: flex;
+  gap: 10px;
+  padding: 4px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.range {
+  flex: none;
+}
+
 .heading {
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--text-muted);
 }
 
@@ -233,26 +269,62 @@ function sign(kind: string): string {
 }
 
 .tiny {
-  padding: 0 6px;
+  padding: 1px 8px;
   font-family: var(--font);
-  font-size: 11px;
+  font-size: calc(var(--fs-small) - 2px);
   border-color: var(--border-strong);
+  border-radius: var(--radius-sm);
 }
 
 .line {
   display: grid;
-  grid-template-columns: 46px 46px 14px 1fr;
+  grid-template-columns: 4.2em 4.2em 1.6em 1fr;
   white-space: pre;
 }
 
-/* Tinted backgrounds rather than coloured text: the eye finds the changed
-   region before it reads any of it. */
+/* Tinted backgrounds rather than coloured text: the eye finds the changed region first. */
 .line.add {
-  background: color-mix(in srgb, var(--green) 14%, transparent);
+  background: color-mix(in srgb, var(--green) 11%, transparent);
 }
 
 .line.delete {
-  background: color-mix(in srgb, var(--red) 14%, transparent);
+  background: color-mix(in srgb, var(--red) 11%, transparent);
+}
+
+/* The gutter stays put when scrolled sideways, so it needs a solid background under its tint. */
+.ln,
+.sign {
+  position: sticky;
+  background: var(--bg);
+}
+
+.ln:nth-child(1) {
+  left: 0;
+}
+
+.ln:nth-child(2) {
+  left: 4.2em;
+}
+
+.sign {
+  left: 8.4em;
+}
+
+/* The gutter of a changed line carries a stronger tint of the same colour. */
+.line.add .ln {
+  background: linear-gradient(color-mix(in srgb, var(--green) 16%, transparent) 0 0), var(--bg);
+}
+
+.line.delete .ln {
+  background: linear-gradient(color-mix(in srgb, var(--red) 16%, transparent) 0 0), var(--bg);
+}
+
+.line.add .sign {
+  background: linear-gradient(color-mix(in srgb, var(--green) 11%, transparent) 0 0), var(--bg);
+}
+
+.line.delete .sign {
+  background: linear-gradient(color-mix(in srgb, var(--red) 11%, transparent) 0 0), var(--bg);
 }
 
 .line.add .sign {
@@ -273,15 +345,23 @@ function sign(kind: string): string {
 }
 
 .line.on {
-  box-shadow: inset 3px 0 0 var(--accent);
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: inset 3px 0 0 var(--blue);
+  background: color-mix(in srgb, var(--blue) 20%, transparent);
+}
+
+.line.on .ln,
+.line.on .sign {
+  background: linear-gradient(color-mix(in srgb, var(--blue) 20%, transparent) 0 0), var(--bg);
+}
+
+.line.on .ln:first-child {
+  box-shadow: inset 3px 0 0 var(--blue);
 }
 
 .ln {
-  padding-right: 8px;
+  padding-right: 10px;
   text-align: right;
   color: var(--text-dim);
-  background: color-mix(in srgb, var(--bg) 60%, transparent);
   user-select: none;
 }
 

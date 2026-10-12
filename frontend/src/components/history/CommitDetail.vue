@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import type { git } from '@wails/go/models'
 import { CommitFiles, Diff } from '@wails/go/main/App'
-import { formatDate } from '@/utils/format'
+import { formatDate, reflow } from '@/utils/format'
 import DiffView from '@/components/common/DiffView.vue'
 
 const props = defineProps<{
@@ -78,20 +78,35 @@ function statusLabel(f: git.FileChange): string {
     <div v-if="!commit" class="empty muted">select a commit</div>
 
     <template v-else>
-      <header class="meta">
-        <span class="mono hash">{{ commit.hash.slice(0, 10) }}</span>
-        <span class="author">{{ commit.author.name }}</span>
-        <span class="muted">&lt;{{ commit.author.email }}&gt;</span>
-        <span class="muted">{{ formatDate(commit.author.when) }}</span>
-        <span v-if="commit.parents.length > 1" class="badge">merge</span>
-        <span class="subject">{{ commit.subject }}</span>
-      </header>
+      <!-- Facts and files on the left, the diff on the right at full height. -->
+      <div class="side">
+        <!-- The subject on top, then every fact in one aligned list of the same size and font. -->
+        <header class="meta">
+          <div class="subject">
+            <span class="subject-text">{{ commit.subject }}</span>
+            <span v-if="commit.parents.length > 1" class="badge">merge</span>
+          </div>
+          <pre v-if="commit.body" class="body">{{ reflow(commit.body) }}</pre>
 
-      <pre v-if="commit.body" class="body">{{ commit.body }}</pre>
+          <dl class="info">
+            <dt>Author</dt>
+            <dd class="who">
+              {{ commit.author.name }} <span class="email">{{ commit.author.email }}</span>
+            </dd>
+            <dt>Commit</dt>
+            <dd>{{ commit.hash.slice(0, 10) }}</dd>
+            <dt>Date</dt>
+            <dd>{{ formatDate(commit.author.when) }}</dd>
+            <dt>{{ commit.parents.length > 1 ? 'Parents' : 'Parent' }}</dt>
+            <dd>
+              <span v-for="p in commit.parents" :key="p" class="parent">{{ p.slice(0, 7) }}</span>
+              <span v-if="!commit.parents.length" class="none">none</span>
+            </dd>
+          </dl>
+        </header>
 
-      <div v-if="error" class="error">{{ error }}</div>
+        <div v-if="error" class="error">{{ error }}</div>
 
-      <div class="panes">
         <div class="files">
           <div v-if="loadingFiles" class="empty muted">loading…</div>
           <div v-else-if="!files.length" class="empty muted">no files changed</div>
@@ -109,12 +124,12 @@ function statusLabel(f: git.FileChange): string {
             <span v-if="f.oldPath" class="renamed muted">← {{ f.oldPath }}</span>
           </div>
         </div>
+      </div>
 
-        <div class="splitv"></div>
+      <div class="splitv"></div>
 
-        <div class="diff-pane">
-          <DiffView :diff="diff" :loading="loadingDiff" />
-        </div>
+      <div class="diff-pane">
+        <DiffView :diff="diff" :loading="loadingDiff" />
       </div>
     </template>
   </div>
@@ -123,60 +138,113 @@ function statusLabel(f: git.FileChange): string {
 <style scoped>
 .detail {
   display: flex;
-  flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--bg-raised);
+  background: var(--bg);
 }
 
 .empty {
-  padding: 10px 14px;
-  font-style: italic;
+  padding: 12px 16px;
   font-size: var(--fs-small);
+}
+
+.side {
+  width: 50%;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-shell);
 }
 
 .meta {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 8px 14px 6px;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px 16px;
   user-select: text;
-  flex: none;
-}
-
-.hash {
-  color: var(--accent);
-}
-
-.author {
-  font-weight: 600;
+  /* Shrinks and scrolls before the file list drops below a few rows. */
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .subject {
-  flex-basis: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  font-size: calc(var(--fs) + 2px);
   font-weight: 600;
+  line-height: 1.3;
+}
+
+.subject-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .badge {
-  padding: 0 5px;
+  flex: none;
+  padding: 2px 8px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: calc(var(--fs-small) - 1px);
+  font-weight: 500;
   color: var(--purple);
-  border: 1px solid var(--purple);
+  background: color-mix(in srgb, var(--purple) 15%, transparent);
 }
 
 .body {
-  margin: 0 14px 8px;
+  margin: -6px 0 0;
   padding: 0;
-  max-height: 120px;
-  overflow: auto;
-  font-family: var(--font-mono);
+  font-family: var(--font);
   font-size: var(--fs-small);
+  line-height: 1.5;
   white-space: pre-wrap;
   color: var(--text-muted);
   user-select: text;
-  flex: none;
+}
+
+/* Label and value in two aligned columns; only the subject is bigger. */
+.info {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 20px;
+  row-gap: 6px;
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.info dt {
+  color: var(--text-dim);
+}
+
+.info dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--text);
+}
+
+.who {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email {
+  margin-left: 6px;
+  color: var(--text-dim);
+}
+
+.parent + .parent {
+  margin-left: 12px;
+}
+
+.none {
+  color: var(--text-dim);
 }
 
 .error {
@@ -185,26 +253,20 @@ function statusLabel(f: git.FileChange): string {
   font-size: var(--fs-small);
 }
 
-.panes {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  border-top: 1px solid var(--border);
-}
-
 .files {
-  width: 280px;
-  flex: none;
+  flex: 1 0 140px;
   overflow-y: auto;
-  padding: 4px 0;
+  padding: 6px;
+  border-top: 1px solid var(--border);
 }
 
 .file {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 2px 10px;
-  height: 21px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 8px;
+  height: 28px;
+  border-radius: var(--radius-sm);
   white-space: nowrap;
   overflow: hidden;
   cursor: default;
@@ -216,32 +278,35 @@ function statusLabel(f: git.FileChange): string {
 }
 
 .file.selected {
-  background: var(--bg-selected);
+  background: var(--accent-soft);
 }
 
+/* The kind of change as git prints it: one coloured letter. */
 .status {
   width: 12px;
   flex: none;
   font-family: var(--font-mono);
-  font-weight: 600;
+  font-size: var(--fs-small);
+  font-weight: 700;
   text-align: center;
+  color: var(--c, var(--text-muted));
 }
 
 .s-A {
-  color: var(--green);
+  --c: var(--green);
 }
 
 .s-M {
-  color: var(--amber);
+  --c: var(--amber);
 }
 
 .s-D {
-  color: var(--red);
+  --c: var(--red);
 }
 
 .s-R,
 .s-C {
-  color: var(--accent);
+  --c: var(--blue);
 }
 
 .path {
@@ -261,6 +326,10 @@ function statusLabel(f: git.FileChange): string {
   width: 1px;
   background: var(--border);
   flex: none;
+}
+
+.path {
+  color: var(--text);
 }
 
 .diff-pane {

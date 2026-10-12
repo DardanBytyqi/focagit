@@ -204,7 +204,7 @@ async function saveDraft() {
 .tick {
   flex: none;
   width: 12px;
-  color: var(--accent);
+  color: var(--blue);
   font-weight: 700;
 }
 
@@ -279,7 +279,7 @@ async function saveDraft() {
 .add-link {
   margin-top: 8px;
   padding: 4px 0;
-  color: var(--accent);
+  color: var(--blue);
   background: none;
   border: none;
 }

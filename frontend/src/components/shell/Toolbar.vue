@@ -65,14 +65,27 @@ const branchTitle = computed(() => {
 <template>
   <div class="toolbar">
     <button
+      class="tool"
       :disabled="!info || busy"
       title="Bring down remote branches without touching yours"
       @click="emit('fetch')"
     >
+      <svg class="icon" viewBox="0 0 16 16">
+        <path d="M13 8a5 5 0 1 1-1.46-3.54" />
+        <path d="M13.2 2.8v2.6h-2.6" />
+      </svg>
       Fetch
     </button>
 
-    <button :disabled="!info || busy" title="Fetch and merge the upstream" @click="emit('pull')">
+    <button
+      class="tool"
+      :disabled="!info || busy"
+      title="Fetch and merge the upstream"
+      @click="emit('pull')"
+    >
+      <svg class="icon" viewBox="0 0 16 16">
+        <path d="M8 2.5v8M4.5 7L8 10.5 11.5 7M3 13.5h10" />
+      </svg>
       Pull
       <span v-if="behind" class="pill behind">{{ behind }}</span>
     </button>
@@ -80,11 +93,14 @@ const branchTitle = computed(() => {
     <!-- Push does the obvious thing; the arrow is for when it is not obvious. -->
     <span class="split">
       <button
-        class="split-main"
+        class="tool split-main"
         :disabled="!info || busy"
         title="Push to the upstream"
         @click="emit('push')"
       >
+        <svg class="icon" viewBox="0 0 16 16">
+          <path d="M8 13.5v-8M4.5 9L8 5.5 11.5 9M3 2.5h10" />
+        </svg>
         Push
         <span v-if="ahead" class="pill">{{ ahead }}</span>
       </button>
@@ -94,24 +110,38 @@ const branchTitle = computed(() => {
         title="Push somewhere else, or overwrite"
         @click="emit('pushOptions')"
       >
-        ▾
+        <svg class="caret" viewBox="0 0 10 10"><path d="M2.5 4l2.5 2.5L7.5 4" /></svg>
       </button>
     </span>
 
     <span class="sep"></span>
 
-    <button :disabled="!info" title="Create a branch from HEAD" @click="emit('branch')">
-      Branch…
+    <button
+      class="tool"
+      :disabled="!info"
+      title="Create a branch from HEAD"
+      @click="emit('branch')"
+    >
+      <svg class="icon" viewBox="0 0 16 16">
+        <circle cx="4.5" cy="3.5" r="1.6" />
+        <circle cx="4.5" cy="12.5" r="1.6" />
+        <circle cx="11.5" cy="3.5" r="1.6" />
+        <path d="M4.5 5.1v5.8M11.5 5.1v1.4a2.5 2.5 0 0 1-2.5 2.5H6.4" />
+      </svg>
+      Branch
     </button>
 
     <!-- Stash puts everything away; the arrow is for a message and the options. -->
     <span class="split">
       <button
-        class="split-main"
+        class="tool split-main"
         :disabled="!info || !dirty"
         title="Put the working tree away and come back to it later"
         @click="emit('stash')"
       >
+        <svg class="icon" viewBox="0 0 16 16">
+          <path d="M2.5 3h11v3h-11zM3.5 6v6.5h9V6M6.5 8.75h3" />
+        </svg>
         Stash
       </button>
       <button
@@ -120,7 +150,7 @@ const branchTitle = computed(() => {
         title="Stash with a message, or only part of it"
         @click="emit('stashOptions')"
       >
-        ▾
+        <svg class="caret" viewBox="0 0 10 10"><path d="M2.5 4l2.5 2.5L7.5 4" /></svg>
       </button>
     </span>
 
@@ -141,11 +171,15 @@ const branchTitle = computed(() => {
       {{ who }}
     </button>
 
-    <span v-if="info" class="sep"></span>
-
     <div v-if="status" class="branch" :title="branchTitle">
+      <svg class="icon" viewBox="0 0 16 16">
+        <circle cx="4.5" cy="3.5" r="1.6" />
+        <circle cx="4.5" cy="12.5" r="1.6" />
+        <circle cx="11.5" cy="3.5" r="1.6" />
+        <path d="M4.5 5.1v5.8M11.5 5.1v1.4a2.5 2.5 0 0 1-2.5 2.5H6.4" />
+      </svg>
       <span class="branch-name">{{ status.detached ? 'detached HEAD' : status.head }}</span>
-      <span v-if="status.upstream" class="tracking muted mono">{{ upstreamLabel }}</span>
+      <span v-if="status.upstream" class="tracking">{{ upstreamLabel }}</span>
       <span v-if="status.ahead" class="ahead">↑{{ status.ahead }}</span>
       <span v-if="status.behind" class="behind">↓{{ status.behind }}</span>
     </div>
@@ -182,10 +216,10 @@ const branchTitle = computed(() => {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   height: var(--toolbar-height);
   padding: 0 10px;
-  background: var(--bg-toolbar);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
   flex: none;
 }
@@ -198,6 +232,35 @@ const branchTitle = computed(() => {
   flex: none;
 }
 
+.icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tool {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 11px;
+  color: var(--text-muted);
+  border-radius: var(--radius);
+}
+
+.tool:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.tool:disabled .icon {
+  opacity: 0.6;
+}
+
 .split {
   display: flex;
 }
@@ -205,48 +268,69 @@ const branchTitle = computed(() => {
 .split-main {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
+  padding-right: 7px;
 }
 
 .split-more {
-  padding: 4px 5px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 32px;
+  padding: 0;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
-  font-size: 10px;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
-/* One outline around the pair while either half is under the pointer. */
+.caret {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* One surface under the pair while either half is under the pointer. */
 .split:hover .split-main:not(:disabled),
 .split:hover .split-more:not(:disabled) {
   background: var(--bg-hover);
-  border-color: var(--border);
+  color: var(--text);
+}
+
+.split .split-more:hover:not(:disabled) {
+  background: var(--border-strong);
 }
 
 .settings {
-  display: flex;
-  padding: 4px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin-left: 4px;
   color: var(--text-muted);
   background: none;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--radius);
 }
 
 .settings svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
 }
 
 .settings:hover,
 .settings[data-state='open'] {
   color: var(--text);
   background: var(--bg-hover);
-  border-color: var(--border);
 }
 
 .sep {
   width: 1px;
   height: 20px;
-  margin: 0 6px;
+  margin: 0 8px;
   background: var(--border);
 }
 
@@ -255,24 +339,25 @@ const branchTitle = computed(() => {
 }
 
 .pill {
-  margin-left: 6px;
+  margin-left: 2px;
 }
 
-/* Amber like everywhere else, and legible on a disabled button. */
 .pill.behind {
-  background: var(--amber);
-  color: var(--bg);
+  color: var(--amber);
 }
 
 .identity {
   display: flex;
   align-items: center;
-  gap: 6px;
-  max-width: 260px;
+  gap: 8px;
+  height: 32px;
+  max-width: 280px;
   flex: 0 1 auto;
   min-width: 0;
+  padding: 0 10px;
   font-size: var(--fs-small);
   color: var(--text-muted);
+  border-radius: var(--radius);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -294,12 +379,21 @@ const branchTitle = computed(() => {
   background: var(--red);
 }
 
+/* Where HEAD is, as a chip: the one piece of state every action depends on. */
 .branch {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   flex: 0 1 auto;
   min-width: 0;
+  height: 30px;
+  padding: 0 4px 0 6px;
+}
+
+.branch .icon {
+  width: 14px;
+  height: 14px;
+  color: var(--green);
 }
 
 .branch-name,
@@ -313,17 +407,20 @@ const branchTitle = computed(() => {
 .branch-name {
   flex: 1 1 auto;
   font-weight: 600;
-  color: var(--green);
+  font-size: var(--fs-small);
 }
 
 .tracking {
   flex: 0 1 auto;
   font-size: var(--fs-small);
+  color: var(--text-dim);
 }
 
 .ahead,
 .behind {
   flex: none;
+  font-size: var(--fs-small);
+  font-weight: 600;
 }
 
 .ahead {

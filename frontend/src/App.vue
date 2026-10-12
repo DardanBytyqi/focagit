@@ -275,6 +275,7 @@ onMounted(async () => {
             :gen="state.gen"
             :refs-by-hash="refsByHash"
             :head="state.status?.head ?? ''"
+            :head-hash="state.status?.oid ?? ''"
             :reveal="reveal"
             @branch="dialogs.newBranch"
             @checkout="checkoutCommit"

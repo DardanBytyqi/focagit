@@ -3,7 +3,7 @@ import type { prefs } from '@wails/go/models'
 import { GetAppearance, SaveAppearance } from '@wails/go/main/App'
 
 /** The default has to exist here too: it is what the window shows before Go answers. */
-const fallback: prefs.Appearance = { theme: 'dark', fontSize: 13 }
+const fallback: prefs.Appearance = { theme: 'dark', fontSize: 14 }
 
 const state = reactive<{ look: prefs.Appearance }>({ look: { ...fallback } })
 
@@ -51,5 +51,5 @@ async function setAppearance(look: prefs.Appearance) {
 }
 
 export function useAppearance() {
-  return { state, loadAppearance, setAppearance }
+  return { state, fallback, loadAppearance, setAppearance }
 }

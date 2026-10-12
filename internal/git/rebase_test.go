@@ -20,8 +20,7 @@ func subjects(t *testing.T, repo *Repo) []string {
 	return out
 }
 
-// conflictingRebase gives main two commits that each clash with altro over
-// shared.txt, with a clean commit between them, so a rebase stops twice.
+// conflictingRebase gives main two commits clashing with altro around a clean one, so a rebase stops twice.
 func conflictingRebase(t *testing.T) (*Repo, func(args ...string), func(name, content string)) {
 	t.Helper()
 	repo, run, write := applyRepo(t)
@@ -145,8 +144,7 @@ func TestRebaseConflictContinuesToTheNextOne(t *testing.T) {
 		t.Errorf("Rebase = %+v, want %+v", st.Rebase, want)
 	}
 
-	// Resolving and continuing replays the clean commit and stops on the next
-	// clash, which the caller learns from the status, not from an error.
+	// Continuing replays the clean commit and stops on the next clash, reported by status, not an error.
 	write("shared.txt", "risolto\n")
 	if err := repo.Stage(ctx, "shared.txt"); err != nil {
 		t.Fatal(err)

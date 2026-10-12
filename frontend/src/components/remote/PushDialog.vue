@@ -176,7 +176,7 @@ async function submit() {
 .link {
   margin-top: 2px;
   padding: 2px 0;
-  color: var(--accent);
+  color: var(--blue);
   background: none;
   border: none;
   font-size: var(--fs-small);
