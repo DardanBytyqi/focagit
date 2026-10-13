@@ -42,11 +42,16 @@ const remoteOptions = computed(() =>
   state.remotes.map((r) => ({ value: r.name, label: r.name, hint: r.push || r.fetch })),
 )
 
-/** The server behind the chosen remote, for talking about it by name. */
-const host = computed(() => {
+const remoteURL = computed(() => {
   const r = state.remotes.find((x) => x.name === remote.value)
-  return remoteHost(r?.push || r?.fetch || '') || 'the server'
+  return r?.push || r?.fetch || ''
 })
+
+/** The server behind the chosen remote, for talking about it by name. */
+const host = computed(() => remoteHost(remoteURL.value) || 'the server')
+
+/** Over HTTPS the sign-in window handles logins, so SSH keys are beside the point. */
+const overSSH = computed(() => !/^https?:\/\//.test(remoteURL.value))
 
 /** git's own words, unless we have clearer ones and something to do about it. */
 const problem = computed(() => {
@@ -143,7 +148,12 @@ async function submit() {
         <p class="error">{{ problem.text }}</p>
         <p v-if="problem.hint" class="hint">{{ problem.hint }}</p>
         <!-- Over SSH, "who are you" is nearly always a key the agent is not holding. -->
-        <button v-if="isAuthFailure(state.error)" type="button" class="link" @click="emit('ssh')">
+        <button
+          v-if="overSSH && isAuthFailure(state.error)"
+          type="button"
+          class="link"
+          @click="emit('ssh')"
+        >
           Check your SSH keys…
         </button>
       </div>

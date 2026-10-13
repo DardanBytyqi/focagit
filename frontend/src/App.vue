@@ -12,6 +12,7 @@ import ConflictView from '@/components/merge/ConflictView.vue'
 import MergeDropMenu from '@/components/merge/MergeDropMenu.vue'
 import OperationBar from '@/components/merge/OperationBar.vue'
 import CloneDialog from '@/components/remote/CloneDialog.vue'
+import CredentialsDialog from '@/components/remote/CredentialsDialog.vue'
 import PushDialog from '@/components/remote/PushDialog.vue'
 import RemoteDialog from '@/components/remote/RemoteDialog.vue'
 import IdentityDialog from '@/components/settings/IdentityDialog.vue'
@@ -301,6 +302,7 @@ onMounted(async () => {
     />
 
     <CloneDialog :open="dialog.clone" @close="dialog.clone = false" />
+    <CredentialsDialog />
     <BranchDialog :request="branchRequest" @close="branchRequest = null" />
     <DeleteBranchDialog :request="deleteRequest" @close="deleteRequest = null" />
     <IdentityDialog

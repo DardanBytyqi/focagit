@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -19,6 +20,12 @@ type runner struct {
 	dir string
 	log *slog.Logger
 }
+
+// extraEnv is added to every git child, set once the app can answer credential prompts.
+var extraEnv atomic.Pointer[[]string]
+
+// SetEnv adds variables to every git command started from now on.
+func SetEnv(vars []string) { extraEnv.Store(&vars) }
 
 // env returns the environment every git child process inherits.
 func env() []string {
@@ -33,6 +40,9 @@ func env() []string {
 	// GIT_TERMINAL_PROMPT misses ssh, which asks on /dev/tty and blocks forever.
 	if os.Getenv("GIT_SSH_COMMAND") == "" {
 		out = append(out, "GIT_SSH_COMMAND=ssh -o BatchMode=yes")
+	}
+	if extra := extraEnv.Load(); extra != nil {
+		out = append(out, *extra...)
 	}
 	return out
 }

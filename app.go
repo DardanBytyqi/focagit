@@ -11,6 +11,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/dardanbytyqi/focagit/internal/credentials"
 	"github.com/dardanbytyqi/focagit/internal/git"
 	"github.com/dardanbytyqi/focagit/internal/patch"
 	"github.com/dardanbytyqi/focagit/internal/prefs"
@@ -24,9 +25,14 @@ type App struct {
 	session *session.Session
 	prefs   *prefs.Store
 
-	// mu guards cloneCancel, which the clone and its cancel button share.
+	// mu guards cloneCancel, which the clone and its cancel button share, and asks.
 	mu          sync.Mutex
 	cloneCancel context.CancelFunc
+
+	// creds answers git's HTTPS prompts; asks holds the questions the window has open.
+	creds  *credentials.Server
+	asks   map[string]chan *credentials.Answer
+	askSeq int
 }
 
 func NewApp() *App {
@@ -35,11 +41,29 @@ func NewApp() *App {
 	if err != nil {
 		slog.Warn("preferences unavailable", slog.String("err", err.Error()))
 	}
-	return &App{session: session.New(), prefs: store}
+	return &App{session: session.New(), prefs: store, asks: map[string]chan *credentials.Answer{}}
 }
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+
+	// Without it git simply fails on a private HTTPS remote, which is how it behaved before.
+	exe, err := os.Executable()
+	if err == nil {
+		broker := credentials.NewBroker(a.askCredentials, credentials.Keyring{}, slog.Default())
+		a.creds, err = credentials.Listen(broker.Handle)
+	}
+	if err != nil {
+		slog.Warn("HTTPS logins cannot be asked for", slog.String("err", err.Error()))
+		return
+	}
+	git.SetEnv(a.creds.Env(exe))
+}
+
+func (a *App) shutdown(context.Context) {
+	if a.creds != nil {
+		a.creds.Close()
+	}
 }
 
 // InitialRepo returns FOCAGIT_OPEN, which lets dev builds skip the welcome screen.
@@ -970,6 +994,64 @@ func (a *App) Reset(id, rev, mode string) error {
 	}
 	a.reload(repo)
 	return nil
+}
+
+// --- HTTPS logins -------------------------------------------------------------
+
+// CredentialsAsk is a question for the sign-in window; ID comes back with the answer.
+type CredentialsAsk struct {
+	ID string `json:"id"`
+	credentials.Question
+}
+
+// askCredentials shows the sign-in window and waits, while git waits on us.
+func (a *App) askCredentials(ctx context.Context, q credentials.Question) (credentials.Answer, bool) {
+	// Nil on the channel means the user cancelled.
+	reply := make(chan *credentials.Answer, 1)
+	a.mu.Lock()
+	a.askSeq++
+	id := fmt.Sprint(a.askSeq)
+	a.asks[id] = reply
+	a.mu.Unlock()
+	defer func() {
+		a.mu.Lock()
+		delete(a.asks, id)
+		a.mu.Unlock()
+	}()
+
+	runtime.EventsEmit(a.ctx, "credentials:ask", CredentialsAsk{ID: id, Question: q})
+	select {
+	case ans := <-reply:
+		if ans == nil {
+			return credentials.Answer{}, false
+		}
+		return *ans, true
+	case <-ctx.Done():
+		// Git gave up or was cancelled, so the window has nothing left to answer.
+		runtime.EventsEmit(a.ctx, "credentials:gone", id)
+		return credentials.Answer{}, false
+	}
+}
+
+// AnswerCredentials hands the window's answer to the git command waiting for it.
+func (a *App) AnswerCredentials(id string, answer credentials.Answer) {
+	a.deliver(id, &answer)
+}
+
+// CancelCredentials tells the waiting git command there is no answer, so it fails.
+func (a *App) CancelCredentials(id string) {
+	a.deliver(id, nil)
+}
+
+// deliver drops a second answer to the same question, from a double click, rather than blocking.
+func (a *App) deliver(id string, answer *credentials.Answer) {
+	a.mu.Lock()
+	reply := a.asks[id]
+	a.mu.Unlock()
+	select {
+	case reply <- answer:
+	default:
+	}
 }
 
 // --- ssh keys -----------------------------------------------------------------

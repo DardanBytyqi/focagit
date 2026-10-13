@@ -110,7 +110,8 @@ const open = defineModel<boolean>('open', { required: true })
   margin-top: 5px;
 }
 
-.dialog input[type='text'] {
+.dialog input[type='text'],
+.dialog input[type='password'] {
   width: 100%;
   height: 36px;
   padding: 0 11px;
@@ -125,7 +126,12 @@ const open = defineModel<boolean>('open', { required: true })
     box-shadow 0.1s ease;
 }
 
-.dialog input[type='text']:focus {
+.dialog input[readonly] {
+  color: var(--text-muted);
+}
+
+.dialog input[type='text']:focus,
+.dialog input[type='password']:focus {
   outline: none;
   border-color: var(--text-dim);
 }
