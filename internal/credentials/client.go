@@ -37,7 +37,7 @@ func run(path, token string, args []string, in io.Reader, out io.Writer) int {
 	if len(args) != 1 {
 		return 1
 	}
-	resp, err := call(path, Request{Token: token, Action: actionPrompt, Prompt: args[0]})
+	resp, err := call(path, Request{Token: token, Action: actionPrompt, Prompt: args[0], Parent: os.Getppid()})
 	if err != nil || !resp.OK {
 		return 1
 	}

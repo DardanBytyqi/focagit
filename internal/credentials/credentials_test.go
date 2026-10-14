@@ -2,8 +2,10 @@ package credentials
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/cgi"
 	"net/http/httptest"
@@ -13,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // TestMain lets git run this test binary as its askpass and credential helper.
@@ -290,5 +293,180 @@ func TestServerRejectsAWrongToken(t *testing.T) {
 
 	if _, err := call(srv.path, Request{Token: "nope", Action: actionPrompt}); err == nil || called {
 		t.Errorf("a request with the wrong token was answered (err %v)", err)
+	}
+}
+
+func TestParsePassphrase(t *testing.T) {
+	if key, ok := parsePassphrase("Enter passphrase for key '/home/x/.ssh/id_ed25519': "); !ok || key != "/home/x/.ssh/id_ed25519" {
+		t.Errorf("got %q %v", key, ok)
+	}
+	if _, ok := parsePassphrase("Username for 'https://host': "); ok {
+		t.Error("a login prompt was read as a passphrase")
+	}
+}
+
+const keyPrompt = "Enter passphrase for key '/k/id_ed25519': "
+
+func TestPassphraseIsRememberedAndReused(t *testing.T) {
+	ctx := context.Background()
+	store := newMemStore()
+	a := &asker{answer: Answer{Password: "frase", Remember: true}, ok: true}
+	b := NewBroker(a.ask, store, quiet())
+
+	r := b.Handle(ctx, Request{Action: actionPrompt, Prompt: keyPrompt, Parent: 100})
+	if r.Answer != "frase" || len(a.questions) != 1 || a.questions[0].Kind != AskPassphrase || a.questions[0].Key != "/k/id_ed25519" {
+		t.Fatalf("answer %+v after %+v", r, a.questions)
+	}
+
+	// Another ssh, another push: the keyring answers and the window stays shut.
+	if r := b.Handle(ctx, Request{Action: actionPrompt, Prompt: keyPrompt, Parent: 200}); r.Answer != "frase" {
+		t.Fatalf("second answer is %+v", r)
+	}
+	if len(a.questions) != 1 {
+		t.Errorf("asked %d times, want the saved passphrase used", len(a.questions))
+	}
+}
+
+func TestWrongPassphraseIsForgottenAndAskedAgain(t *testing.T) {
+	ctx := context.Background()
+	store := newMemStore()
+	store.Set("ssh:/k/id_ed25519", Login{Password: "vecchia"})
+	a := &asker{answer: Answer{Password: "nuova"}, ok: true}
+	b := NewBroker(a.ask, store, quiet())
+
+	if r := b.Handle(ctx, Request{Action: actionPrompt, Prompt: keyPrompt, Parent: 100}); r.Answer != "vecchia" {
+		t.Fatalf("first answer is %+v, want the saved one", r)
+	}
+	// The same ssh asking again means the saved passphrase did not unlock the key.
+	r := b.Handle(ctx, Request{Action: actionPrompt, Prompt: keyPrompt, Parent: 100})
+	if r.Answer != "nuova" || len(a.questions) != 1 || !a.questions[0].Retry {
+		t.Fatalf("answer %+v after %+v, want the window asked again saying it was wrong", r, a.questions)
+	}
+	if _, err := store.Get("ssh:/k/id_ed25519"); err == nil {
+		t.Error("the wrong passphrase is still saved")
+	}
+}
+
+// sshServer runs an unprivileged sshd that lets in one passphrase-protected key, and returns its clone URL.
+func sshServer(t *testing.T, passphrase string) (url, key, knownHosts string) {
+	t.Helper()
+	sshd, err := exec.LookPath("/usr/sbin/sshd")
+	if err != nil {
+		t.Skip("sshd not installed")
+	}
+	dir := t.TempDir()
+	key = filepath.Join(dir, "client")
+	for _, args := range [][]string{
+		{"-q", "-t", "ed25519", "-N", "", "-f", filepath.Join(dir, "host")},
+		{"-q", "-t", "ed25519", "-N", passphrase, "-f", key},
+	} {
+		if out, err := exec.Command("ssh-keygen", args...).CombinedOutput(); err != nil {
+			t.Fatalf("ssh-keygen: %v\n%s", err, out)
+		}
+	}
+	pub, _ := os.ReadFile(key + ".pub")
+	os.WriteFile(filepath.Join(dir, "authorized"), pub, 0o600)
+
+	// A free port, released just before sshd takes it.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	ln.Close()
+
+	cfg := filepath.Join(dir, "sshd_config")
+	os.WriteFile(cfg, []byte(fmt.Sprintf("Port %d\nListenAddress 127.0.0.1\nHostKey %s\nAuthorizedKeysFile %s\n"+
+		"StrictModes no\nUsePAM no\nPidFile none\nPasswordAuthentication no\n",
+		port, filepath.Join(dir, "host"), filepath.Join(dir, "authorized"))), 0o600)
+	cmd := exec.Command(sshd, "-D", "-e", "-f", cfg)
+	var log strings.Builder
+	cmd.Stderr = &log
+	if err := cmd.Start(); err != nil {
+		t.Skipf("sshd will not start: %v", err)
+	}
+	t.Cleanup(func() { cmd.Process.Kill(); cmd.Wait() })
+	for i := 0; ; i++ {
+		if c, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port)); err == nil {
+			c.Close()
+			break
+		}
+		if i == 50 {
+			t.Skipf("sshd never listened: %s", log.String())
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	hostPub, _ := os.ReadFile(filepath.Join(dir, "host.pub"))
+	fields := strings.Fields(string(hostPub))
+	knownHosts = filepath.Join(dir, "known_hosts")
+	os.WriteFile(knownHosts, []byte(fmt.Sprintf("[127.0.0.1]:%d %s %s\n", port, fields[0], fields[1])), 0o600)
+
+	bare := filepath.Join(dir, "repo.git")
+	if out, err := exec.Command("git", "init", "-q", "--bare", bare).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	return fmt.Sprintf("ssh://%s@127.0.0.1:%d%s", os.Getenv("USER"), port, bare), key, knownHosts
+}
+
+// cloneOverSSH clones with ssh set up as git.sshCommand does when askpass is available.
+func cloneOverSSH(t *testing.T, srv *Server, url, key, knownHosts string) error {
+	t.Helper()
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("git", "clone", "-q", url, filepath.Join(t.TempDir(), "clone"))
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "SSH_AUTH_SOCK=",
+		"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no"+
+			" -o IdentitiesOnly=yes -o UserKnownHostsFile="+knownHosts+" -i "+key)
+	cmd.Env = append(cmd.Env, srv.Env(exe)...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Logf("git clone: %s", out)
+	}
+	return err
+}
+
+func TestCloneOverSSHUnlocksTheKey(t *testing.T) {
+	url, key, known := sshServer(t, "frase")
+	store := newMemStore()
+	a := &asker{answer: Answer{Password: "frase", Remember: true}, ok: true}
+	srv, err := Listen(NewBroker(a.ask, store, quiet()).Handle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+
+	if err := cloneOverSSH(t, srv, url, key, known); err != nil {
+		t.Fatalf("first clone: %v", err)
+	}
+	if len(a.questions) != 1 || a.questions[0].Kind != AskPassphrase || a.questions[0].Key != key {
+		t.Fatalf("questions %+v, want one passphrase for %s", a.questions, key)
+	}
+	if err := cloneOverSSH(t, srv, url, key, known); err != nil {
+		t.Fatalf("second clone: %v", err)
+	}
+	if len(a.questions) != 1 {
+		t.Errorf("asked %d times, want the saved passphrase used", len(a.questions))
+	}
+}
+
+func TestCloneOverSSHAsksAgainAfterAWrongPassphrase(t *testing.T) {
+	url, key, known := sshServer(t, "frase")
+	store := newMemStore()
+	store.Set("ssh:"+key, Login{Password: "sbagliata"})
+	a := &asker{answer: Answer{Password: "frase"}, ok: true}
+	srv, err := Listen(NewBroker(a.ask, store, quiet()).Handle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+
+	if err := cloneOverSSH(t, srv, url, key, known); err != nil {
+		t.Fatalf("clone: %v", err)
+	}
+	if len(a.questions) != 1 || !a.questions[0].Retry {
+		t.Errorf("questions %+v, want one retry after the saved passphrase failed", a.questions)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -37,14 +38,25 @@ func env() []string {
 		"GIT_EDITOR=true",       // --continue would open one and wait forever
 	)
 
-	// GIT_TERMINAL_PROMPT misses ssh, which asks on /dev/tty and blocks forever.
+	extra := extraEnv.Load()
 	if os.Getenv("GIT_SSH_COMMAND") == "" {
-		out = append(out, "GIT_SSH_COMMAND=ssh -o BatchMode=yes")
+		out = append(out, "GIT_SSH_COMMAND="+sshCommand(extra != nil && slices.ContainsFunc(*extra, func(v string) bool {
+			return strings.HasPrefix(v, "SSH_ASKPASS=")
+		})))
 	}
-	if extra := extraEnv.Load(); extra != nil {
+	if extra != nil {
 		out = append(out, *extra...)
 	}
 	return out
+}
+
+// sshCommand never lets ssh ask on /dev/tty, which GIT_TERMINAL_PROMPT does not cover and would block forever.
+func sshCommand(askpass bool) string {
+	if !askpass {
+		return "ssh -o BatchMode=yes"
+	}
+	// Only key passphrases go to askpass: unknown hosts still fail, for the trust dialog to settle.
+	return "ssh -o StrictHostKeyChecking=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no"
 }
 
 func (r runner) command(ctx context.Context, args ...string) *exec.Cmd {

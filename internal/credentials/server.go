@@ -30,6 +30,8 @@ type Request struct {
 	Action string            `json:"action"`
 	Prompt string            `json:"prompt,omitempty"`
 	Fields map[string]string `json:"fields,omitempty"`
+	// Parent is the process that asked, so a repeated passphrase prompt from one ssh means a wrong answer.
+	Parent int `json:"parent,omitempty"`
 }
 
 // Response is the answer to print; OK false makes askpass fail, which git reports.
@@ -91,6 +93,9 @@ func (s *Server) Env(exe string) []string {
 	n, _ := strconv.Atoi(os.Getenv("GIT_CONFIG_COUNT"))
 	return []string{
 		"GIT_ASKPASS=" + exe,
+		// ssh asks for key passphrases the same way, even when it has a terminal.
+		"SSH_ASKPASS=" + exe,
+		"SSH_ASKPASS_REQUIRE=force",
 		envSocket + "=" + s.path,
 		envToken + "=" + s.token,
 		"GIT_CONFIG_COUNT=" + strconv.Itoa(n+1),

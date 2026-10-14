@@ -11,12 +11,25 @@ import (
 	"time"
 )
 
-// Question is what the window asks: where to sign in, and the username git already knows, if any.
+// Question is what the window asks: a login for a server, or the passphrase of an SSH key.
 type Question struct {
-	// URL is the origin, scheme and host, with no path or user.
+	Kind QuestionKind `json:"kind"`
+	// URL is the origin, scheme and host, with no path or user; empty for a passphrase.
 	URL      string `json:"url"`
 	Username string `json:"username"`
+	// Key is the private key file a passphrase unlocks.
+	Key string `json:"key"`
+	// Retry says the last answer for this key was wrong.
+	Retry bool `json:"retry"`
 }
+
+// QuestionKind tells the window which form to show.
+type QuestionKind string
+
+const (
+	AskLogin      QuestionKind = "login"
+	AskPassphrase QuestionKind = "passphrase"
+)
 
 // Answer is what the user typed; Remember keeps it in the keyring once git says it worked.
 type Answer struct {
@@ -62,16 +75,21 @@ type Broker struct {
 
 	mu      sync.Mutex
 	pending map[string]pending
+	// unlocked remembers which ssh process each key's last passphrase went to.
+	unlocked map[string]int
 }
 
 func NewBroker(ask AskFunc, store Store, log *slog.Logger) *Broker {
-	return &Broker{ask: ask, store: store, log: log, now: time.Now, pending: map[string]pending{}}
+	return &Broker{ask: ask, store: store, log: log, now: time.Now, pending: map[string]pending{}, unlocked: map[string]int{}}
 }
 
 // Handle answers one request from the askpass or credential-helper side.
 func (b *Broker) Handle(ctx context.Context, req Request) Response {
 	switch req.Action {
 	case actionPrompt:
+		if key, ok := parsePassphrase(req.Prompt); ok {
+			return b.passphrase(ctx, key, req.Parent)
+		}
 		return b.prompt(ctx, req.Prompt)
 	case "get":
 		return b.get(req.Fields)
@@ -99,7 +117,7 @@ func (b *Broker) prompt(ctx context.Context, text string) Response {
 		}
 	}
 
-	ans, ok := b.ask(ctx, Question{URL: origin, Username: user})
+	ans, ok := b.ask(ctx, Question{Kind: AskLogin, URL: origin, Username: user})
 	if !ok {
 		return Response{}
 	}
@@ -114,6 +132,42 @@ func (b *Broker) prompt(ctx context.Context, text string) Response {
 		return Response{OK: true, Answer: ans.Username}
 	}
 	return Response{OK: true, Answer: ans.Password}
+}
+
+// passphrase unlocks an SSH key from the keyring, or asks; the same ssh asking twice means it was wrong.
+func (b *Broker) passphrase(ctx context.Context, key string, parent int) Response {
+	entry := "ssh:" + key
+	b.mu.Lock()
+	retry := parent != 0 && b.unlocked[key] == parent
+	b.mu.Unlock()
+
+	if retry {
+		if err := b.store.Delete(entry); err != nil {
+			b.log.Warn("could not forget the passphrase", slog.String("key", key), slog.String("err", err.Error()))
+		}
+	} else if l, err := b.store.Get(entry); err == nil {
+		b.unlock(key, parent)
+		return Response{OK: true, Answer: l.Password}
+	}
+
+	ans, ok := b.ask(ctx, Question{Kind: AskPassphrase, Key: key, Retry: retry})
+	if !ok {
+		return Response{}
+	}
+	// ssh never says a passphrase worked, only asks again when it did not, which forgets it above.
+	if ans.Remember {
+		if err := b.store.Set(entry, Login{Password: ans.Password}); err != nil {
+			b.log.Warn("could not save the passphrase", slog.String("key", key), slog.String("err", err.Error()))
+		}
+	}
+	b.unlock(key, parent)
+	return Response{OK: true, Answer: ans.Password}
+}
+
+func (b *Broker) unlock(key string, parent int) {
+	b.mu.Lock()
+	b.unlocked[key] = parent
+	b.mu.Unlock()
 }
 
 // get hands git a saved login, and nothing when there is none so it moves on to prompting.
@@ -195,6 +249,16 @@ func parsePrompt(text string) (kind, origin, user string, ok bool) {
 		return "", "", "", false
 	}
 	return kind, u.Scheme + "://" + u.Host, u.User.Username(), true
+}
+
+// parsePassphrase reads the key file out of ssh's "Enter passphrase for key '…': " prompt.
+func parsePassphrase(text string) (string, bool) {
+	rest, found := strings.CutPrefix(text, "Enter passphrase for key '")
+	if !found {
+		return "", false
+	}
+	key, _, found := strings.Cut(rest, "'")
+	return key, found && key != ""
 }
 
 // originOf builds the origin from a credential request's protocol and host fields.

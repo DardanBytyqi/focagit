@@ -14,6 +14,21 @@ func TestEnvDisablesSSHPrompts(t *testing.T) {
 		t.Error("ssh can still block on a prompt")
 	}
 
+	// With askpass in place ssh may ask for a passphrase there, but still never on /dev/tty or about hosts.
+	t.Run("askpass lets passphrases through", func(t *testing.T) {
+		SetEnv([]string{"SSH_ASKPASS=/bin/focagit", "SSH_ASKPASS_REQUIRE=force"})
+		t.Cleanup(func() { extraEnv.Store(nil) })
+		var cmd string
+		for _, kv := range env() {
+			if v, ok := strings.CutPrefix(kv, "GIT_SSH_COMMAND="); ok {
+				cmd = v
+			}
+		}
+		if strings.Contains(cmd, "BatchMode") || !strings.Contains(cmd, "StrictHostKeyChecking=yes") {
+			t.Errorf("ssh command is %q", cmd)
+		}
+	})
+
 	// Someone who set their own command means it, keys and all.
 	t.Run("a command the user set wins", func(t *testing.T) {
 		const mine = "GIT_SSH_COMMAND=ssh -i /my/key"
