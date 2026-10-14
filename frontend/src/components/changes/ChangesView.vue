@@ -419,16 +419,22 @@ watch(
               placeholder="Commit summary"
               maxlength="200"
               @paste="onSummaryPaste"
+              @keydown.ctrl.enter.prevent="canCommit && commit()"
             />
             <span class="counter" :class="{ warn: summaryTooLong }">{{ summary.length }}</span>
           </div>
-          <textarea v-model="description" class="description" placeholder="Description"></textarea>
+          <textarea
+            v-model="description"
+            class="description"
+            placeholder="Description"
+            @keydown.ctrl.enter.prevent="canCommit && commit()"
+          ></textarea>
         </div>
 
         <div class="commit-row">
           <Check v-model="amend" class="amend">Amend</Check>
           <span class="spacer"></span>
-          <button class="primary" :disabled="!canCommit" @click="commit">
+          <button class="primary" :disabled="!canCommit" title="Ctrl+Enter" @click="commit">
             {{
               amend
                 ? 'Amend Commit'

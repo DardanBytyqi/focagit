@@ -31,6 +31,7 @@ import { useAppearance } from '@/composables/useAppearance'
 import { useDialogs } from '@/composables/useDialogs'
 import { usePrefs } from '@/composables/usePrefs'
 import { useRepo } from '@/composables/useRepo'
+import { useShortcuts } from '@/composables/useShortcuts'
 
 const {
   state,
@@ -53,7 +54,7 @@ const {
   pushTag,
 } = useRepo()
 const { state: prefsState, loadSignature } = usePrefs()
-const { loadAppearance } = useAppearance()
+const { state: look, loadAppearance, setAppearance } = useAppearance()
 const dialogs = useDialogs()
 const {
   open: dialog,
@@ -166,6 +167,39 @@ function branchFromHead() {
   const st = state.status
   dialogs.newBranch('HEAD', st && !st.detached ? st.head : 'HEAD')
 }
+
+/** The tab beside the current one, wrapping round at either end. */
+function stepTab(by: number) {
+  const tabs = state.tabs
+  const i = tabs.findIndex((t) => t.id === state.info?.id)
+  if (tabs.length > 1 && i >= 0) switchTo(tabs[(i + by + tabs.length) % tabs.length].id)
+}
+
+// Same bounds as the settings stepper and prefs.normalise.
+const zoom = (size: number) =>
+  setAppearance({ ...look.look, fontSize: Math.min(20, Math.max(10, size)) })
+
+// Network actions wait for the one running, as their disabled buttons do.
+const idle = () => !!state.info && !state.busy
+
+useShortcuts({
+  fetch: () => idle() && doFetch(),
+  pull: () => idle() && doPull(),
+  push: () => idle() && doPush(),
+  branch: () => state.info && branchFromHead(),
+  stash: () => state.info && changeCount.value > 0 && doStash(),
+  history: () => state.info && (mode.value = 'commit'),
+  changes: () => state.info && (mode.value = 'changes'),
+  open: browse,
+  closeTab: () => state.info && close(state.info.id),
+  nextTab: () => stepTab(1),
+  prevTab: () => stepTab(-1),
+  settings: () => dialogs.showSettings(''),
+  zoomIn: () => zoom(look.look.fontSize + 1),
+  zoomOut: () => zoom(look.look.fontSize - 1),
+  zoomReset: () => zoom(14),
+  refresh: () => state.info && refresh(),
+})
 
 // The native window injects the Go bindings before our script runs.
 async function bindingsReady(timeoutMs = 5000): Promise<boolean> {

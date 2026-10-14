@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from 'reka-ui'
 import type { git, session } from '@wails/go/models'
+import { withKey } from '@/composables/useShortcuts'
 
 const props = defineProps<{
   info: session.Info | null
@@ -67,7 +68,7 @@ const branchTitle = computed(() => {
     <button
       class="tool"
       :disabled="!info || busy"
-      title="Bring down remote branches without touching yours"
+      :title="withKey('Bring down remote branches without touching yours', 'fetch')"
       @click="emit('fetch')"
     >
       <svg class="icon" viewBox="0 0 16 16">
@@ -80,7 +81,7 @@ const branchTitle = computed(() => {
     <button
       class="tool"
       :disabled="!info || busy"
-      title="Fetch and merge the upstream"
+      :title="withKey('Fetch and merge the upstream', 'pull')"
       @click="emit('pull')"
     >
       <svg class="icon" viewBox="0 0 16 16">
@@ -95,7 +96,7 @@ const branchTitle = computed(() => {
       <button
         class="tool split-main"
         :disabled="!info || busy"
-        title="Push to the upstream"
+        :title="withKey('Push to the upstream', 'push')"
         @click="emit('push')"
       >
         <svg class="icon" viewBox="0 0 16 16">
@@ -119,7 +120,7 @@ const branchTitle = computed(() => {
     <button
       class="tool"
       :disabled="!info"
-      title="Create a branch from HEAD"
+      :title="withKey('Create a branch from HEAD', 'branch')"
       @click="emit('branch')"
     >
       <svg class="icon" viewBox="0 0 16 16">
@@ -136,7 +137,7 @@ const branchTitle = computed(() => {
       <button
         class="tool split-main"
         :disabled="!info || !dirty"
-        title="Put the working tree away and come back to it later"
+        :title="withKey('Put the working tree away and come back to it later', 'stash')"
         @click="emit('stash')"
       >
         <svg class="icon" viewBox="0 0 16 16">
