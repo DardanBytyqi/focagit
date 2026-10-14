@@ -318,9 +318,15 @@ onBeforeUnmount(() => {
       <span class="find-count muted">
         {{ matches.length ? `${current + 1}/${matches.length}` : query ? 'none' : '' }}
       </span>
-      <button class="find-btn" :disabled="!matches.length" @click="step(-1)">‹</button>
-      <button class="find-btn" :disabled="!matches.length" @click="step(1)">›</button>
-      <button class="find-btn" @click="closeFind">✕</button>
+      <button class="find-btn" :disabled="!matches.length" title="Previous" @click="step(-1)">
+        <svg viewBox="0 0 12 12"><path d="M3 7.5L6 4.5 9 7.5" /></svg>
+      </button>
+      <button class="find-btn" :disabled="!matches.length" title="Next" @click="step(1)">
+        <svg viewBox="0 0 12 12"><path d="M3 4.5L6 7.5 9 4.5" /></svg>
+      </button>
+      <button class="find-btn" title="Close" @click="closeFind">
+        <svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" /></svg>
+      </button>
     </div>
 
     <div class="header">
@@ -566,7 +572,11 @@ onBeforeUnmount(() => {
 }
 
 .find-btn {
-  padding: 1px 7px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   color: inherit;
   cursor: default;
   background: none;
@@ -576,6 +586,16 @@ onBeforeUnmount(() => {
 
 .find-btn:hover:not(:disabled) {
   background: var(--bg-hover);
+}
+
+.find-btn svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .find-btn:disabled {
