@@ -28,8 +28,8 @@ var extraEnv atomic.Pointer[[]string]
 // SetEnv adds variables to every git command started from now on.
 func SetEnv(vars []string) { extraEnv.Store(&vars) }
 
-// env returns the environment every git child process inherits.
-func env() []string {
+// env returns the environment every git child process inherits; ownSSH false leaves the ssh command to git config.
+func env(ownSSH bool) []string {
 	out := append(os.Environ(),
 		"LC_ALL=C",              // stable, parseable messages regardless of locale
 		"GIT_PAGER=cat",         // never hand output to less and hang forever
@@ -39,7 +39,7 @@ func env() []string {
 	)
 
 	extra := extraEnv.Load()
-	if os.Getenv("GIT_SSH_COMMAND") == "" {
+	if ownSSH && os.Getenv("GIT_SSH_COMMAND") == "" {
 		out = append(out, "GIT_SSH_COMMAND="+sshCommand(extra != nil && slices.ContainsFunc(*extra, func(v string) bool {
 			return strings.HasPrefix(v, "SSH_ASKPASS=")
 		})))
@@ -62,8 +62,23 @@ func sshCommand(askpass bool) string {
 func (r runner) command(ctx context.Context, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, r.bin, args...)
 	cmd.Dir = r.dir
-	cmd.Env = env()
+	// GIT_SSH_COMMAND outranks core.sshCommand, so a repository that names its own would silently lose it.
+	cmd.Env = env(!reachesRemote(args) || !r.configuredSSH(ctx))
 	return cmd
+}
+
+// reachesRemote says whether a git command may start ssh; pull goes through Fetch.
+func reachesRemote(args []string) bool {
+	return len(args) > 0 && slices.Contains([]string{"clone", "fetch", "push"}, args[0])
+}
+
+// configuredSSH says whether git config picks the ssh command, for this repository or globally.
+func (r runner) configuredSSH(ctx context.Context) bool {
+	cmd := exec.CommandContext(ctx, r.bin, "config", "--get", "core.sshCommand")
+	cmd.Dir = r.dir
+	cmd.Env = append(os.Environ(), "LC_ALL=C", "GIT_OPTIONAL_LOCKS=0")
+	out, err := cmd.Output()
+	return err == nil && strings.TrimSpace(string(out)) != ""
 }
 
 // finish records how an invocation went.
