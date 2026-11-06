@@ -136,6 +136,40 @@ function scrollTo(i: number) {
   scrollTop.value = vp.scrollTop
 }
 
+// ---- ref chips ------------------------------------------------------------
+
+const MAX_CHIPS = 3
+
+type Chip = { ref: git.Ref; synced: boolean }
+
+// A remote on the same commit as its local branch folds into that branch's chip.
+const chipsByHash = computed(() => {
+  const out = new Map<string, { shown: Chip[]; rest: git.Ref[] }>()
+  for (const [hash, refs] of props.refsByHash) {
+    const folded = new Set<string>()
+    const chips: Chip[] = []
+    for (const r of refs) {
+      if (r.kind !== 'branch') continue
+      const remote = refs.find(
+        (o) =>
+          o.kind === 'remote' &&
+          (o.short === r.upstream || o.short.slice(o.short.indexOf('/') + 1) === r.short),
+      )
+      if (remote) folded.add(remote.name)
+      chips.push({ ref: r, synced: !!remote })
+    }
+    for (const r of refs) {
+      if (r.kind === 'branch' || folded.has(r.name) || r.short.endsWith('/HEAD')) continue
+      chips.push({ ref: r, synced: false })
+    }
+    // The checked-out branch comes first, so it is never the one hidden.
+    chips.sort((a, b) => Number(b.ref.head) - Number(a.ref.head))
+    const shown = chips.length > MAX_CHIPS + 1 ? chips.slice(0, MAX_CHIPS) : chips
+    out.set(hash, { shown, rest: chips.slice(shown.length).map((c) => c.ref) })
+  }
+  return out
+})
+
 // Clicking a ref lands on its commit, wherever in the history that is.
 watch(
   () => props.reveal,
@@ -401,17 +435,41 @@ onBeforeUnmount(() => {
                 </svg>
 
                 <span class="col-subject">
-                  <span
-                    v-for="r in props.refsByHash.get(row.entry.commit.hash) ?? []"
-                    :key="r.name"
-                    class="badge"
-                    :class="[r.kind, { current: r.head }]"
-                  >
-                    <RefIcon
-                      :kind="r.kind === 'remote' ? 'remote' : r.kind === 'tag' ? 'tag' : 'branch'"
-                    />
-                    {{ r.short }}
-                  </span>
+                  <template v-if="chipsByHash.get(row.entry.commit.hash)">
+                    <span
+                      v-for="c in chipsByHash.get(row.entry.commit.hash)!.shown"
+                      :key="c.ref.name"
+                      class="badge"
+                      :class="[c.ref.kind, { current: c.ref.head }]"
+                      :title="
+                        c.synced ? `${c.ref.short} · ${c.ref.upstream || 'origin'}` : undefined
+                      "
+                    >
+                      <RefIcon
+                        :kind="
+                          c.ref.kind === 'remote'
+                            ? 'remote'
+                            : c.ref.kind === 'tag'
+                              ? 'tag'
+                              : 'branch'
+                        "
+                      />
+                      {{ c.ref.short }}
+                      <RefIcon v-if="c.synced" kind="remote" class="synced" />
+                    </span>
+                    <span
+                      v-if="chipsByHash.get(row.entry.commit.hash)!.rest.length"
+                      class="badge more"
+                      :title="
+                        chipsByHash
+                          .get(row.entry.commit.hash)!
+                          .rest.map((r) => r.short)
+                          .join('\n')
+                      "
+                    >
+                      +{{ chipsByHash.get(row.entry.commit.hash)!.rest.length }}
+                    </span>
+                  </template>
                   <span class="subject-text">{{ row.entry.commit.subject }}</span>
                 </span>
 
@@ -496,7 +554,9 @@ onBeforeUnmount(() => {
 .row {
   display: grid;
   /* Sized from --fs, not em, so the smaller header font keeps the same columns as the rows. */
-  grid-template-columns: var(--graph-w) 1fr calc(var(--fs) * 10.5) calc(var(--fs) * 8.5) calc(var(--fs) * 4.5);
+  grid-template-columns: var(--graph-w) 1fr calc(var(--fs) * 10.5) calc(var(--fs) * 8.5) calc(
+      var(--fs) * 4.5
+    );
   align-items: center;
   gap: 16px;
   padding: 0 14px;
@@ -709,6 +769,21 @@ onBeforeUnmount(() => {
 
 .badge.tag .ref-icon {
   color: var(--text-dim);
+}
+
+/* The globe after a branch name: its remote sits on the same commit. */
+.badge .ref-icon.synced {
+  width: 10px;
+  height: 10px;
+  margin-left: -1px;
+  opacity: 0.75;
+}
+
+.badge.more {
+  padding: 0 6px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 .badge.current {
