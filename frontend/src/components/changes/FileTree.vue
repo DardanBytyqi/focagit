@@ -65,7 +65,9 @@ function markClass(f: git.FileStatus, staged: boolean): string {
         @click.stop="emit('toggleDir', n.path)"
         ><svg viewBox="0 0 12 12"><path d="M3 4.5L6 7.5 9 4.5" /></svg
       ></span>
-      <span class="name">{{ n.name }}</span>
+      <span class="name" :class="{ tail: n.name.includes('/') }" :title="n.path">
+        <span dir="ltr">{{ n.name }}</span>
+      </span>
       <span class="actions">
         <button
           class="tiny"
@@ -280,5 +282,11 @@ function markClass(f: git.FileStatus, staged: boolean): string {
 .tiny.danger:hover:not(:disabled) {
   color: var(--red);
   border-color: var(--red);
+}
+
+/* A folded path keeps its deepest folder: the ellipsis eats the start instead. */
+.name.tail {
+  direction: rtl;
+  text-align: left;
 }
 </style>

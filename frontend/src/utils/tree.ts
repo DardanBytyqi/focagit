@@ -27,7 +27,17 @@ export function buildTree(files: git.FileStatus[]): TreeNode[] {
   }
 
   sort(root)
-  return root.children
+  return root.children.map(compact)
+}
+
+/** A directory holding only one directory folds into it, so a deep path takes one row. */
+function compact(node: TreeNode): TreeNode {
+  while (node.dir && node.children.length === 1 && node.children[0].dir) {
+    const only = node.children[0]
+    node = { ...only, name: `${node.name}/${only.name}` }
+  }
+  if (node.dir) node.children = node.children.map(compact)
+  return node
 }
 
 /** Directories before files, then alphabetical — the convention everywhere. */
