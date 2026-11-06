@@ -2,13 +2,13 @@
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
-// Always DD/MM/YYYY HH:MM:SS in local time, so every row has the same width.
-export function formatDate(value: unknown): string {
+// Always DD/MM/YYYY HH:MM[:SS] in local time, so every row has the same width.
+export function formatDate(value: unknown, seconds = true): string {
   if (!value) return ''
   const d = new Date(value as string)
   if (Number.isNaN(d.getTime())) return ''
   const day = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`
-  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}` + (seconds ? `:${pad(d.getSeconds())}` : '')
   return `${day} ${time}`
 }
 

@@ -12,6 +12,7 @@ import type { git, session } from '@wails/go/models'
 import { CommitIndex, CommitRange, SearchCommits } from '@wails/go/main/App'
 import { formatDate } from '@/utils/format'
 import RefIcon from '@/components/shell/RefIcon.vue'
+import AuthorMark from '@/components/common/AuthorMark.vue'
 
 const props = defineProps<{
   repoId: string
@@ -53,6 +54,8 @@ const MAX_LANES = 10
 const viewport = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const viewportHeight = ref(0)
+// The list's scrollbar width, which the header pads by so the columns line up.
+const gutter = ref(0)
 const selected = ref<string>('')
 
 /** Page cache, keyed by page index. */
@@ -294,6 +297,7 @@ onMounted(() => {
   viewportHeight.value = viewport.value.clientHeight
   observer = new ResizeObserver(() => {
     viewportHeight.value = viewport.value?.clientHeight ?? 0
+    gutter.value = viewport.value ? viewport.value.offsetWidth - viewport.value.clientWidth : 0
   })
   observer.observe(viewport.value)
   ensureVisiblePages()
@@ -329,7 +333,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <div class="header">
+    <div class="header" :style="{ paddingRight: 14 + gutter + 'px' }">
       <span></span>
       <span>Description</span>
       <span class="col-author">Author</span>
@@ -411,9 +415,15 @@ onBeforeUnmount(() => {
                   <span class="subject-text">{{ row.entry.commit.subject }}</span>
                 </span>
 
-                <span class="col-author muted">{{ row.entry.commit.author.name }}</span>
-                <span class="col-date muted">{{ formatDate(row.entry.commit.author.when) }}</span>
-                <span class="col-hash mono muted">{{ row.entry.commit.hash.slice(0, 7) }}</span>
+                <span class="col-author">
+                  <AuthorMark
+                    :name="row.entry.commit.author.name"
+                    :email="row.entry.commit.author.email"
+                  />
+                  <span class="author-name">{{ row.entry.commit.author.name }}</span>
+                </span>
+                <span class="col-date">{{ formatDate(row.entry.commit.author.when, false) }}</span>
+                <span class="col-hash">{{ row.entry.commit.hash.slice(0, 7) }}</span>
               </template>
 
               <!-- The page for this row has not arrived yet. -->
@@ -485,10 +495,10 @@ onBeforeUnmount(() => {
 .header,
 .row {
   display: grid;
-  /* Each column a similar margin wider than its value, in em, so they sit evenly spaced. */
-  grid-template-columns: var(--graph-w) 1fr 9em 11.5em 6em;
+  /* Sized from --fs, not em, so the smaller header font keeps the same columns as the rows. */
+  grid-template-columns: var(--graph-w) 1fr calc(var(--fs) * 10.5) calc(var(--fs) * 8.5) calc(var(--fs) * 4.5);
   align-items: center;
-  gap: 10px;
+  gap: 16px;
   padding: 0 14px;
 }
 
@@ -630,26 +640,40 @@ onBeforeUnmount(() => {
 }
 
 .col-author,
-.col-date {
+.col-date,
+.col-hash {
   overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.row .col-author,
+.row .col-date,
+.row .col-hash {
   font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
   color: var(--text-muted);
 }
 
-.col-hash {
+.row .col-author {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.author-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row .col-hash {
+  font-family: var(--font-mono);
+  font-size: calc(var(--fs-small) - 1px);
   color: var(--text-dim);
 }
 
-/* The values read as columns only when they line up in the middle. */
-.col-author,
-.col-date,
-.col-hash {
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Refs drawn in their commit's lane colour: solid local, dashed remote, filled when checked out. */
+/* Branches tinted in their lane colour, remotes outlined, tags neutral; filled when checked out. */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -662,7 +686,7 @@ onBeforeUnmount(() => {
   font-weight: 600;
   line-height: 1;
   color: var(--text);
-  border: 1px solid var(--lane);
+  background: color-mix(in srgb, var(--lane) 18%, transparent);
 }
 
 .badge .ref-icon {
@@ -672,9 +696,19 @@ onBeforeUnmount(() => {
 }
 
 .badge.remote {
-  border-style: dashed;
+  background: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lane) 55%, transparent);
+  font-weight: 500;
+}
+
+.badge.tag {
+  background: var(--bg-hover);
   color: var(--text-muted);
   font-weight: 500;
+}
+
+.badge.tag .ref-icon {
+  color: var(--text-dim);
 }
 
 .badge.current {

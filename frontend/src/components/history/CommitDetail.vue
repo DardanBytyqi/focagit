@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import type { git } from '@wails/go/models'
 import { CommitFiles, Diff } from '@wails/go/main/App'
 import { formatDate, reflow } from '@/utils/format'
+import AuthorMark from '@/components/common/AuthorMark.vue'
 import DiffView from '@/components/common/DiffView.vue'
 
 const props = defineProps<{
@@ -91,6 +92,7 @@ function statusLabel(f: git.FileChange): string {
           <dl class="info">
             <dt>Author</dt>
             <dd class="who">
+              <AuthorMark :name="commit.author.name" :email="commit.author.email" :size="16" />
               {{ commit.author.name }} <span class="email">{{ commit.author.email }}</span>
             </dd>
             <dt>Commit</dt>
@@ -229,9 +231,18 @@ function statusLabel(f: git.FileChange): string {
 }
 
 .who {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.who .email {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .email {

@@ -410,7 +410,7 @@ function toggle(key: string) {
 }
 
 .ref.tag .ref-icon {
-  color: var(--amber);
+  color: var(--text-dim);
 }
 
 /* Pushed to the right edge, and only there when the pointer is. */

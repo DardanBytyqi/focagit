@@ -34,6 +34,8 @@
 
   /* The two sides of a conflict. Not green and red: those mean added and removed. */
   --mine: #4fbcc4;
+  /* Lightness of the author pixel marks; their hue comes from the email. */
+  --mark-l: 0.72;
   --theirs: #b493e8;
 
   --shadow: rgb(0 0 0 / 0.45);
@@ -92,6 +94,7 @@
   --lane-7: #646b78;
 
   --mine: #0b8690;
+  --mark-l: 0.58;
   --theirs: #7448c8;
 
   --shadow: rgb(0 0 0 / 0.14);
