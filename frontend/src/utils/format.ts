@@ -8,7 +8,8 @@ export function formatDate(value: unknown, seconds = true): string {
   const d = new Date(value as string)
   if (Number.isNaN(d.getTime())) return ''
   const day = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`
-  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}` + (seconds ? `:${pad(d.getSeconds())}` : '')
+  const time =
+    `${pad(d.getHours())}:${pad(d.getMinutes())}` + (seconds ? `:${pad(d.getSeconds())}` : '')
   return `${day} ${time}`
 }
 
