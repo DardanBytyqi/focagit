@@ -738,6 +738,24 @@ func (a *App) SaveAppearance(look prefs.Appearance) (prefs.Appearance, error) {
 	return a.prefs.Appearance(), nil
 }
 
+// --- shortcuts -----------------------------------------------------------------
+
+// GetShortcuts is the bindings that differ from the defaults.
+func (a *App) GetShortcuts() map[string]string {
+	if a.prefs == nil {
+		return map[string]string{}
+	}
+	return a.prefs.Shortcuts()
+}
+
+// SaveShortcuts stores the bindings that differ from the defaults.
+func (a *App) SaveShortcuts(m map[string]string) error {
+	if a.prefs == nil {
+		return errors.New("preferences are unavailable")
+	}
+	return a.prefs.SaveShortcuts(m)
+}
+
 // --- merge --------------------------------------------------------------------
 
 // PreviewMerge answers what a merge would do, so the UI offers only real choices.

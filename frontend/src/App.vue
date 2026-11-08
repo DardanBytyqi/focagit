@@ -31,7 +31,7 @@ import { useAppearance } from '@/composables/useAppearance'
 import { useDialogs } from '@/composables/useDialogs'
 import { usePrefs } from '@/composables/usePrefs'
 import { useRepo } from '@/composables/useRepo'
-import { useShortcuts } from '@/composables/useShortcuts'
+import { useShortcuts, useShortcutSettings } from '@/composables/useShortcuts'
 
 const {
   state,
@@ -55,6 +55,7 @@ const {
 } = useRepo()
 const { state: prefsState, loadSignature } = usePrefs()
 const { state: look, loadAppearance, setAppearance } = useAppearance()
+const { loadShortcuts } = useShortcutSettings()
 const dialogs = useDialogs()
 const {
   open: dialog,
@@ -218,6 +219,7 @@ onMounted(async () => {
   }
   // Before anything is shown, so the window does not flash the wrong theme.
   await loadAppearance()
+  loadShortcuts()
 
   const path = await InitialRepo()
   if (path) await open(path)

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import Select from '@/components/common/Select.vue'
 import { useAppearance } from '@/composables/useAppearance'
 
 const { state, fallback, setAppearance } = useAppearance()
@@ -13,6 +15,17 @@ const themes = [
   { value: 'system', label: 'System' },
 ]
 
+const systemUI = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+const systemMono = 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace'
+
+/** font previews the choice in the list itself, so there is nothing to imagine. */
+const fonts = [
+  { value: 'default', label: 'Red Hat', font: '"Red Hat Text Variable", ' + systemUI },
+  { value: 'system', label: 'System', font: systemUI },
+  { value: 'spacemono', label: 'Space Mono', font: `"Space Mono", ${systemMono}` },
+  { value: 'plexmono', label: 'IBM Plex Mono', font: `"IBM Plex Mono", ${systemMono}` },
+]
+
 /** Every control writes the whole object, so there is one path into the store. */
 function set<K extends keyof typeof state.look>(key: K, value: (typeof state.look)[K]) {
   setAppearance({ ...state.look, [key]: value })
@@ -21,6 +34,11 @@ function set<K extends keyof typeof state.look>(key: K, value: (typeof state.loo
 function stepSize(by: number) {
   set('fontSize', Math.min(MAX, Math.max(MIN, state.look.fontSize + by)))
 }
+
+const fontChoice = computed({
+  get: () => state.look.font,
+  set: (v: string) => set('font', v),
+})
 </script>
 
 <template>
@@ -68,6 +86,9 @@ function stepSize(by: number) {
         Default ({{ fallback.fontSize }} px)
       </button>
     </div>
+
+    <label>Font</label>
+    <Select v-model="fontChoice" :options="fonts" />
   </div>
 </template>
 

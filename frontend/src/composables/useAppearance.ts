@@ -3,7 +3,19 @@ import type { prefs } from '@wails/go/models'
 import { GetAppearance, SaveAppearance } from '@wails/go/main/App'
 
 /** The default has to exist here too: it is what the window shows before Go answers. */
-const fallback: prefs.Appearance = { theme: 'dark', fontSize: 14 }
+const fallback: prefs.Appearance = { theme: 'dark', fontSize: 14, font: 'default' }
+
+const systemUI = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+const systemMono = 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace'
+
+const fontStacks: Record<string, { font: string; fontMono: string }> = {
+  system: { font: systemUI, fontMono: systemMono },
+  spacemono: { font: `"Space Mono", ${systemMono}`, fontMono: `"Space Mono", ${systemMono}` },
+  plexmono: {
+    font: `"IBM Plex Mono", ${systemMono}`,
+    fontMono: `"IBM Plex Mono", ${systemMono}`,
+  },
+}
 
 const state = reactive<{ look: prefs.Appearance }>({ look: { ...fallback } })
 
@@ -21,6 +33,15 @@ function apply() {
 
   root.style.setProperty('--fs', `${state.look.fontSize}px`)
   root.style.setProperty('--fs-small', `${state.look.fontSize - 1}px`)
+
+  const stack = fontStacks[state.look.font]
+  if (stack) {
+    root.style.setProperty('--font', stack.font)
+    root.style.setProperty('--font-mono', stack.fontMono)
+  } else {
+    root.style.removeProperty('--font')
+    root.style.removeProperty('--font-mono')
+  }
 }
 
 // A desktop that switches to dark at sunset should take the window with it.
