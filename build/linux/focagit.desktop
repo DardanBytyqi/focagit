@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=focagit
+Comment=Git client
+Exec=focagit
+Icon=focagit
+StartupWMClass=focagit
+Terminal=false
+Categories=Development;RevisionControl;
+Keywords=git;

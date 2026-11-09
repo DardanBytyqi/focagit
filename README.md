@@ -10,6 +10,15 @@ make test    # go test -race ./...
 make dev     # Wails live reload
 make build   # desktop binary → build/bin/focagit
 make cli     # terminal harness over the git layer
+make package # .deb, .rpm and .tar.gz in dist/ (needs nfpm)
+```
+
+## Releases
+
+Pushing a `v*` tag builds the Linux packages and attaches them to a GitHub release:
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
 ```
 
 ## Requirements
@@ -18,6 +27,7 @@ Go 1.26+, git, Node 20+, and the Wails CLI:
 
 ```bash
 go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.48.0   # only for make package
 ```
 
 `wails doctor` checks the rest.

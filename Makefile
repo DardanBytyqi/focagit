@@ -6,7 +6,7 @@ WAILS_FLAGS := -tags webkit2_41
 endif
 WAILS := $(shell go env GOPATH)/bin/wails
 
-.PHONY: test cli dev build lint fmt tidy
+.PHONY: test cli dev build package lint fmt tidy
 
 ## test: run the whole suite with the race detector
 test:
@@ -23,6 +23,17 @@ dev:
 ## build: production desktop binary (from stage 2 on)
 build:
 	$(WAILS) build $(WAILS_FLAGS)
+
+# The latest tag without its v, so a tagged commit packages as its own version.
+VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || true)
+NFPM := $(shell go env GOPATH)/bin/nfpm
+
+## package: .deb, .rpm and .tar.gz of the Linux build in dist/
+package: build
+	mkdir -p dist
+	VERSION=$(or $(VERSION),0.0.0) $(NFPM) pkg -f build/linux/nfpm.yaml -p deb -t dist/
+	VERSION=$(or $(VERSION),0.0.0) $(NFPM) pkg -f build/linux/nfpm.yaml -p rpm -t dist/
+	tar -czf dist/focagit-$(or $(VERSION),0.0.0)-linux-amd64.tar.gz -C build/bin focagit -C ../linux focagit.desktop -C .. appicon.svg
 
 lint:
 	go vet ./...
