@@ -37,7 +37,7 @@ type Appearance struct {
 	Theme string `json:"theme"`
 	// FontSize is the base size in pixels; everything else is relative to it.
 	FontSize int `json:"fontSize"`
-	// Font is "default", "system", "spacemono" or "plexmono".
+	// Font is "default" (Inter), "system", "redhat", "spacemono" or "plexmono".
 	Font string `json:"font"`
 }
 
@@ -58,7 +58,7 @@ func (a Appearance) normalise() Appearance {
 		a.FontSize = def.FontSize
 	}
 	switch a.Font {
-	case "default", "system", "spacemono", "plexmono":
+	case "default", "system", "redhat", "spacemono", "plexmono":
 	default:
 		a.Font = def.Font
 	}

@@ -10,6 +10,10 @@ const systemMono = 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace'
 
 const fontStacks: Record<string, { font: string; fontMono: string }> = {
   system: { font: systemUI, fontMono: systemMono },
+  redhat: {
+    font: `"Red Hat Text Variable", ${systemUI}`,
+    fontMono: `"Red Hat Mono Variable", ${systemMono}`,
+  },
   spacemono: { font: `"Space Mono", ${systemMono}`, fontMono: `"Space Mono", ${systemMono}` },
   plexmono: {
     font: `"IBM Plex Mono", ${systemMono}`,

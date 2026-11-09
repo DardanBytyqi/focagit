@@ -20,8 +20,9 @@ const systemMono = 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace'
 
 /** font previews the choice in the list itself, so there is nothing to imagine. */
 const fonts = [
-  { value: 'default', label: 'Red Hat', font: '"Red Hat Text Variable", ' + systemUI },
+  { value: 'default', label: 'Inter', font: '"Inter Variable", ' + systemUI },
   { value: 'system', label: 'System', font: systemUI },
+  { value: 'redhat', label: 'Red Hat', font: `"Red Hat Text Variable", ${systemUI}` },
   { value: 'spacemono', label: 'Space Mono', font: `"Space Mono", ${systemMono}` },
   { value: 'plexmono', label: 'IBM Plex Mono', font: `"IBM Plex Mono", ${systemMono}` },
 ]
