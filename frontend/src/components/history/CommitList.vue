@@ -773,10 +773,10 @@ onBeforeUnmount(() => {
 
 /* The globe after a branch name: its remote sits on the same commit. */
 .badge .ref-icon.synced {
-  width: 10px;
-  height: 10px;
-  margin-left: -1px;
-  opacity: 0.75;
+  width: 12px;
+  height: 12px;
+  margin-left: 1px;
+  stroke-width: 1.5;
 }
 
 .badge.more {
