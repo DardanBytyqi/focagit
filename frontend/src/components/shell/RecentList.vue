@@ -27,7 +27,9 @@ function shorten(path: string): string {
         @click="!r.missing && emit('open', r.path)"
       >
         <span class="name">{{ r.name }}</span>
-        <span class="path muted">{{ shorten(r.path) }}</span>
+        <span class="path muted"
+          ><span dir="ltr">{{ shorten(r.path) }}</span></span
+        >
         <button class="forget" title="Remove from this list" @click.stop="forgetRepo(r.path)">
           ×
         </button>
