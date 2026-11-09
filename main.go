@@ -15,6 +15,9 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed build/appicon.png
+var icon []byte
+
 func main() {
 	// Git starts this same binary to ask for a password; that run never opens a window.
 	if code, ok := credentials.Main(os.Args[1:]); ok {
@@ -42,6 +45,7 @@ func main() {
 		Bind:             []any{app},
 		Linux: &linux.Options{
 			ProgramName: "focagit",
+			Icon:        icon,
 			// The webview renders the whole UI.
 			WindowIsTranslucent: false,
 		},
