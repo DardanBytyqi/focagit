@@ -111,7 +111,7 @@ async function trust() {
   display: block;
   margin-top: 4px;
   padding: 0;
-  color: var(--accent);
+  color: var(--blue);
   background: none;
   border: none;
   font-size: var(--fs-small);

@@ -29,6 +29,7 @@ const says: Record<string, string> = {
 }
 
 const hard = computed(() => mode.value === 'hard')
+const here = computed(() => !!preview.value && !preview.value.behind && !preview.value.ahead)
 // Only a hard reset touches the working tree, so only it can lose unsaved work.
 const losesWork = computed(() => hard.value && !!preview.value?.dirty)
 
@@ -80,7 +81,9 @@ async function confirm() {
         <p class="says">{{ says[mode] }}</p>
       </div>
 
-      <p v-if="preview?.behind" class="hint">
+      <!-- Resetting onto HEAD moves nothing; only the changes setting still acts. -->
+      <p v-if="here" class="hint">{{ request?.branch || 'HEAD' }} is already on this commit.</p>
+      <p v-else-if="preview?.behind" class="hint">
         {{ preview.behind }} commit{{ preview.behind > 1 ? 's' : '' }} left behind.
       </p>
       <p v-else-if="preview?.ahead" class="hint">
@@ -95,7 +98,7 @@ async function confirm() {
         <button
           type="button"
           :class="hard ? 'danger' : 'primary'"
-          :disabled="busy"
+          :disabled="busy || (here && mode === 'soft')"
           @click="confirm"
         >
           Reset

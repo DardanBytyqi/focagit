@@ -12,6 +12,7 @@ import ConflictView from '@/components/merge/ConflictView.vue'
 import MergeDropMenu from '@/components/merge/MergeDropMenu.vue'
 import OperationBar from '@/components/merge/OperationBar.vue'
 import CloneDialog from '@/components/remote/CloneDialog.vue'
+import CredentialsDialog from '@/components/remote/CredentialsDialog.vue'
 import PushDialog from '@/components/remote/PushDialog.vue'
 import RemoteDialog from '@/components/remote/RemoteDialog.vue'
 import IdentityDialog from '@/components/settings/IdentityDialog.vue'
@@ -23,17 +24,21 @@ import StashView from '@/components/stash/StashView.vue'
 import DeleteTagDialog from '@/components/tag/DeleteTagDialog.vue'
 import TagDialog from '@/components/tag/TagDialog.vue'
 import StatusBar from '@/components/shell/StatusBar.vue'
+import TabBar from '@/components/shell/TabBar.vue'
 import Toolbar from '@/components/shell/Toolbar.vue'
 import Welcome from '@/components/shell/Welcome.vue'
 import { useAppearance } from '@/composables/useAppearance'
 import { useDialogs } from '@/composables/useDialogs'
 import { usePrefs } from '@/composables/usePrefs'
 import { useRepo } from '@/composables/useRepo'
+import { useShortcuts, useShortcutSettings } from '@/composables/useShortcuts'
 
 const {
   state,
   refsByHash,
   open,
+  switchTo,
+  close,
   browse,
   refresh,
   checkout,
@@ -41,6 +46,7 @@ const {
   fetchAll,
   push,
   merge,
+  rebase,
   pull,
   stash,
   applyStash,
@@ -48,7 +54,8 @@ const {
   pushTag,
 } = useRepo()
 const { state: prefsState, loadSignature } = usePrefs()
-const { loadAppearance } = useAppearance()
+const { state: look, loadAppearance, setAppearance } = useAppearance()
+const { loadShortcuts } = useShortcutSettings()
 const dialogs = useDialogs()
 const {
   open: dialog,
@@ -131,6 +138,18 @@ async function confirmMerge(noFastForward: boolean) {
   await merge({ ref: req.source.short, noFastForward, message: '' })
 }
 
+const doRebase = (onto: string) => rebase({ onto })
+
+/** Dropping a branch on another rebases the one it landed on, as merge does. */
+async function confirmRebase() {
+  const req = mergeDrop.value
+  mergeDrop.value = null
+  if (!req) return
+
+  if (!req.target.head && !(await checkout(req.target))) return
+  await rebase({ onto: req.source.short })
+}
+
 // A tag names a commit, so checking one out can only detach HEAD.
 const checkoutTag = (t: git.Tag) => checkoutCommit(t.hash)
 
@@ -150,6 +169,39 @@ function branchFromHead() {
   dialogs.newBranch('HEAD', st && !st.detached ? st.head : 'HEAD')
 }
 
+/** The tab beside the current one, wrapping round at either end. */
+function stepTab(by: number) {
+  const tabs = state.tabs
+  const i = tabs.findIndex((t) => t.id === state.info?.id)
+  if (tabs.length > 1 && i >= 0) switchTo(tabs[(i + by + tabs.length) % tabs.length].id)
+}
+
+// Same bounds as the settings stepper and prefs.normalise.
+const zoom = (size: number) =>
+  setAppearance({ ...look.look, fontSize: Math.min(20, Math.max(10, size)) })
+
+// Network actions wait for the one running, as their disabled buttons do.
+const idle = () => !!state.info && !state.busy
+
+useShortcuts({
+  fetch: () => idle() && doFetch(),
+  pull: () => idle() && doPull(),
+  push: () => idle() && doPush(),
+  branch: () => state.info && branchFromHead(),
+  stash: () => state.info && changeCount.value > 0 && doStash(),
+  history: () => state.info && (mode.value = 'commit'),
+  changes: () => state.info && (mode.value = 'changes'),
+  open: browse,
+  closeTab: () => state.info && close(state.info.id),
+  nextTab: () => stepTab(1),
+  prevTab: () => stepTab(-1),
+  settings: () => dialogs.showSettings(''),
+  zoomIn: () => zoom(look.look.fontSize + 1),
+  zoomOut: () => zoom(look.look.fontSize - 1),
+  zoomReset: () => zoom(14),
+  refresh: () => state.info && refresh(),
+})
+
 // The native window injects the Go bindings before our script runs.
 async function bindingsReady(timeoutMs = 5000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
@@ -167,6 +219,7 @@ onMounted(async () => {
   }
   // Before anything is shown, so the window does not flash the wrong theme.
   await loadAppearance()
+  loadShortcuts()
 
   const path = await InitialRepo()
   if (path) await open(path)
@@ -177,13 +230,21 @@ onMounted(async () => {
 
 <template>
   <div class="app">
+    <TabBar
+      :tabs="state.tabs"
+      :active-id="state.info?.id ?? ''"
+      :busy="state.busy"
+      @select="switchTo"
+      @close="close"
+      @open="browse"
+      @clone="dialog.clone = true"
+    />
+
     <Toolbar
       :info="state.info"
       :status="state.status"
       :signature="prefsState.signature"
       :busy="state.busy"
-      @browse="browse"
-      @clone="dialog.clone = true"
       @branch="branchFromHead"
       @identity="dialog.identity = true"
       @fetch="doFetch"
@@ -210,6 +271,7 @@ onMounted(async () => {
         @reveal="revealRef"
         @checkout="checkout"
         @merge="doMerge"
+        @rebase="(r) => doRebase(r.short)"
         @merge-drop="(s, t, x, y) => (mergeDrop = { source: s, target: t, x, y })"
         @create="dialogs.newBranch"
         @rename="dialogs.renameBranch"
@@ -250,6 +312,7 @@ onMounted(async () => {
             :gen="state.gen"
             :refs-by-hash="refsByHash"
             :head="state.status?.head ?? ''"
+            :head-hash="state.status?.oid ?? ''"
             :reveal="reveal"
             @branch="dialogs.newBranch"
             @checkout="checkoutCommit"
@@ -257,6 +320,7 @@ onMounted(async () => {
             @revert="applyRequest = { kind: 'revert', commit: $event }"
             @cherry-pick="applyRequest = { kind: 'cherry-pick', commit: $event }"
             @reset="askReset"
+            @rebase="doRebase"
           />
         </template>
 
@@ -274,6 +338,7 @@ onMounted(async () => {
     />
 
     <CloneDialog :open="dialog.clone" @close="dialog.clone = false" />
+    <CredentialsDialog />
     <BranchDialog :request="branchRequest" @close="branchRequest = null" />
     <DeleteBranchDialog :request="deleteRequest" @close="deleteRequest = null" />
     <IdentityDialog
@@ -295,7 +360,12 @@ onMounted(async () => {
     <ResetDialog :request="resetRequest" @close="resetRequest = null" />
     <TagDialog :request="tagRequest" @close="tagRequest = null" />
     <DeleteTagDialog :tag="deleteTagRequest" @close="deleteTagRequest = null" />
-    <MergeDropMenu :drop="mergeDrop" @merge="confirmMerge" @close="mergeDrop = null" />
+    <MergeDropMenu
+      :drop="mergeDrop"
+      @merge="confirmMerge"
+      @rebase="confirmRebase"
+      @close="mergeDrop = null"
+    />
     <ConflictView :open="dialog.conflicts" @close="dialog.conflicts = false" />
   </div>
 </template>

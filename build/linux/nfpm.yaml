@@ -1,0 +1,28 @@
+# nfpm turns build/bin/focagit into a .deb and an .rpm; VERSION comes from the environment.
+name: focagit
+arch: amd64
+platform: linux
+version: ${VERSION}
+version_schema: semver
+section: devel
+priority: optional
+maintainer: Dardan Bytyqi <bdardan76@gmail.com>
+description: A desktop Git client.
+homepage: https://github.com/DardanBytyqi/focagit
+
+contents:
+  - src: build/bin/focagit
+    dst: /usr/bin/focagit
+  - src: build/linux/focagit.desktop
+    dst: /usr/share/applications/focagit.desktop
+  - src: build/appicon.svg
+    dst: /usr/share/icons/hicolor/scalable/apps/focagit.svg
+  - src: build/linux/focagit-256.png
+    dst: /usr/share/icons/hicolor/256x256/apps/focagit.png
+
+# Debian and Fedora name the same libraries differently.
+overrides:
+  deb:
+    depends: [git, libgtk-3-0, libwebkit2gtk-4.1-0]
+  rpm:
+    depends: [git, gtk3, webkit2gtk4.1]

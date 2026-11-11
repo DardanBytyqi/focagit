@@ -11,6 +11,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/dardanbytyqi/focagit/internal/credentials"
 	"github.com/dardanbytyqi/focagit/internal/git"
 	"github.com/dardanbytyqi/focagit/internal/patch"
 	"github.com/dardanbytyqi/focagit/internal/prefs"
@@ -24,9 +25,14 @@ type App struct {
 	session *session.Session
 	prefs   *prefs.Store
 
-	// mu guards cloneCancel, which the clone and its cancel button share.
+	// mu guards cloneCancel, which the clone and its cancel button share, and asks.
 	mu          sync.Mutex
 	cloneCancel context.CancelFunc
+
+	// creds answers git's HTTPS prompts; asks holds the questions the window has open.
+	creds  *credentials.Server
+	asks   map[string]chan *credentials.Answer
+	askSeq int
 }
 
 func NewApp() *App {
@@ -35,11 +41,29 @@ func NewApp() *App {
 	if err != nil {
 		slog.Warn("preferences unavailable", slog.String("err", err.Error()))
 	}
-	return &App{session: session.New(), prefs: store}
+	return &App{session: session.New(), prefs: store, asks: map[string]chan *credentials.Answer{}}
 }
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+
+	// Without it git simply fails on a private HTTPS remote, which is how it behaved before.
+	exe, err := os.Executable()
+	if err == nil {
+		broker := credentials.NewBroker(a.askCredentials, credentials.Keyring{}, slog.Default())
+		a.creds, err = credentials.Listen(broker.Handle)
+	}
+	if err != nil {
+		slog.Warn("HTTPS logins cannot be asked for", slog.String("err", err.Error()))
+		return
+	}
+	git.SetEnv(a.creds.Env(exe))
+}
+
+func (a *App) shutdown(context.Context) {
+	if a.creds != nil {
+		a.creds.Close()
+	}
 }
 
 // InitialRepo returns FOCAGIT_OPEN, which lets dev builds skip the welcome screen.
@@ -84,7 +108,8 @@ func (a *App) reload(repo *session.Repo) {
 				ID: repo.Info.ID, Gen: gen, Loaded: loaded, Width: width, Done: done,
 			})
 		})
-		if err != nil {
+		// A cancelled walk was replaced by a newer one, which reports for itself.
+		if err != nil && !errors.Is(err, context.Canceled) {
 			runtime.EventsEmit(a.ctx, "repo:progress", Progress{
 				ID: repo.Info.ID, Gen: repo.Gen(), Done: true, Error: err.Error(),
 			})
@@ -243,6 +268,15 @@ func (a *App) CommitRange(id string, offset, count int) ([]session.Entry, error)
 	return repo.Range(offset, count), nil
 }
 
+// SearchCommits is the rows of the cached history whose commit matches query.
+func (a *App) SearchCommits(id, query string) ([]int, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	return repo.Search(query), nil
+}
+
 // CommitIndex is the row a commit sits on, so the list can scroll to it, or -1
 // when the history does not hold it.
 func (a *App) CommitIndex(id, hash string) (int, error) {
@@ -323,6 +357,15 @@ func (a *App) DiscardFiles(id string, paths []string) error {
 		return err
 	}
 	return repo.Discard(a.ctx, paths...)
+}
+
+// AddToGitignore appends a path to the repository's root .gitignore.
+func (a *App) AddToGitignore(id, path string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	return repo.AddToGitignore(path)
 }
 
 // StageLines stages or unstages a selection of lines within one file.
@@ -704,6 +747,24 @@ func (a *App) SaveAppearance(look prefs.Appearance) (prefs.Appearance, error) {
 	return a.prefs.Appearance(), nil
 }
 
+// --- shortcuts -----------------------------------------------------------------
+
+// GetShortcuts is the bindings that differ from the defaults.
+func (a *App) GetShortcuts() map[string]string {
+	if a.prefs == nil {
+		return map[string]string{}
+	}
+	return a.prefs.Shortcuts()
+}
+
+// SaveShortcuts stores the bindings that differ from the defaults.
+func (a *App) SaveShortcuts(m map[string]string) error {
+	if a.prefs == nil {
+		return errors.New("preferences are unavailable")
+	}
+	return a.prefs.SaveShortcuts(m)
+}
+
 // --- merge --------------------------------------------------------------------
 
 // PreviewMerge answers what a merge would do, so the UI offers only real choices.
@@ -746,7 +807,22 @@ func (a *App) Pull(id string, opts git.PullOptions) (git.MergeResult, error) {
 	return res, nil
 }
 
-// AbortOperation throws away the merge, revert or cherry-pick left half-finished.
+// Rebase replays the current branch on top of another ref and reloads what changed.
+func (a *App) Rebase(id string, opts git.RebaseOptions) (git.RebaseResult, error) {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return git.RebaseResult{}, err
+	}
+	res, err := repo.Rebase(a.ctx, opts)
+	// A refused rebase can still have stopped halfway, so the views reload either way.
+	a.reload(repo)
+	if err != nil {
+		return git.RebaseResult{}, err
+	}
+	return res, nil
+}
+
+// AbortOperation throws away the merge, rebase, revert or cherry-pick left half-finished.
 func (a *App) AbortOperation(id string) error {
 	repo, err := a.session.Get(id)
 	if err != nil {
@@ -766,6 +842,19 @@ func (a *App) FinishOperation(id, message string) error {
 		return err
 	}
 	if err := repo.FinishOperation(a.ctx, message); err != nil {
+		return err
+	}
+	a.reload(repo)
+	return nil
+}
+
+// SkipOperation drops the commit a rebase stopped on and carries on with the rest.
+func (a *App) SkipOperation(id string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := repo.SkipOperation(a.ctx); err != nil {
 		return err
 	}
 	a.reload(repo)
@@ -932,6 +1021,64 @@ func (a *App) Reset(id, rev, mode string) error {
 	}
 	a.reload(repo)
 	return nil
+}
+
+// --- HTTPS logins -------------------------------------------------------------
+
+// CredentialsAsk is a question for the sign-in window; ID comes back with the answer.
+type CredentialsAsk struct {
+	ID string `json:"id"`
+	credentials.Question
+}
+
+// askCredentials shows the sign-in window and waits, while git waits on us.
+func (a *App) askCredentials(ctx context.Context, q credentials.Question) (credentials.Answer, bool) {
+	// Nil on the channel means the user cancelled.
+	reply := make(chan *credentials.Answer, 1)
+	a.mu.Lock()
+	a.askSeq++
+	id := fmt.Sprint(a.askSeq)
+	a.asks[id] = reply
+	a.mu.Unlock()
+	defer func() {
+		a.mu.Lock()
+		delete(a.asks, id)
+		a.mu.Unlock()
+	}()
+
+	runtime.EventsEmit(a.ctx, "credentials:ask", CredentialsAsk{ID: id, Question: q})
+	select {
+	case ans := <-reply:
+		if ans == nil {
+			return credentials.Answer{}, false
+		}
+		return *ans, true
+	case <-ctx.Done():
+		// Git gave up or was cancelled, so the window has nothing left to answer.
+		runtime.EventsEmit(a.ctx, "credentials:gone", id)
+		return credentials.Answer{}, false
+	}
+}
+
+// AnswerCredentials hands the window's answer to the git command waiting for it.
+func (a *App) AnswerCredentials(id string, answer credentials.Answer) {
+	a.deliver(id, &answer)
+}
+
+// CancelCredentials tells the waiting git command there is no answer, so it fails.
+func (a *App) CancelCredentials(id string) {
+	a.deliver(id, nil)
+}
+
+// deliver drops a second answer to the same question, from a double click, rather than blocking.
+func (a *App) deliver(id string, answer *credentials.Answer) {
+	a.mu.Lock()
+	reply := a.asks[id]
+	a.mu.Unlock()
+	select {
+	case reply <- answer:
+	default:
+	}
 }
 
 // --- ssh keys -----------------------------------------------------------------

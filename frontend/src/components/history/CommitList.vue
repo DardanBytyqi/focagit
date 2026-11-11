@@ -9,9 +9,10 @@ import {
   ContextMenuTrigger,
 } from 'reka-ui'
 import type { git, session } from '@wails/go/models'
-import { CommitIndex, CommitRange } from '@wails/go/main/App'
+import { CommitIndex, CommitRange, SearchCommits } from '@wails/go/main/App'
 import { formatDate } from '@/utils/format'
 import RefIcon from '@/components/shell/RefIcon.vue'
+import AuthorMark from '@/components/common/AuthorMark.vue'
 
 const props = defineProps<{
   repoId: string
@@ -22,6 +23,8 @@ const props = defineProps<{
   refsByHash: Map<string, git.Ref[]>
   /** The branch a reset would move; empty when HEAD is detached. */
   head: string
+  /** The commit HEAD points at, branch or not, which the graph rings. */
+  headHash: string
   /** A commit to scroll to and select; the nonce lets the same one be asked twice. */
   reveal: { hash: string; nonce: number } | null
 }>()
@@ -34,15 +37,16 @@ const emit = defineEmits<{
   revert: [commit: git.Commit]
   cherryPick: [commit: git.Commit]
   reset: [commit: git.Commit]
+  rebase: [hash: string]
 }>()
 
 /** Virtualised list. */
-const ROW = 24
+const ROW = 30
 const OVERSCAN = 12
 const PAGE = 200
 
 /** Graph geometry. Lanes are evenly spaced; the dot sits at the row's middle. */
-const LANE_W = 13
+const LANE_W = 15
 const MID = ROW / 2
 // The column is sized for the widest point of the whole history.
 const MAX_LANES = 10
@@ -50,6 +54,8 @@ const MAX_LANES = 10
 const viewport = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const viewportHeight = ref(0)
+// The list's scrollbar width, which the header pads by so the columns line up.
+const gutter = ref(0)
 const selected = ref<string>('')
 
 /** Page cache, keyed by page index. */
@@ -130,6 +136,40 @@ function scrollTo(i: number) {
   scrollTop.value = vp.scrollTop
 }
 
+// ---- ref chips ------------------------------------------------------------
+
+const MAX_CHIPS = 3
+
+type Chip = { ref: git.Ref; synced: boolean }
+
+// A remote on the same commit as its local branch folds into that branch's chip.
+const chipsByHash = computed(() => {
+  const out = new Map<string, { shown: Chip[]; rest: git.Ref[] }>()
+  for (const [hash, refs] of props.refsByHash) {
+    const folded = new Set<string>()
+    const chips: Chip[] = []
+    for (const r of refs) {
+      if (r.kind !== 'branch') continue
+      const remote = refs.find(
+        (o) =>
+          o.kind === 'remote' &&
+          (o.short === r.upstream || o.short.slice(o.short.indexOf('/') + 1) === r.short),
+      )
+      if (remote) folded.add(remote.name)
+      chips.push({ ref: r, synced: !!remote })
+    }
+    for (const r of refs) {
+      if (r.kind === 'branch' || folded.has(r.name) || r.short.endsWith('/HEAD')) continue
+      chips.push({ ref: r, synced: false })
+    }
+    // The checked-out branch comes first, so it is never the one hidden.
+    chips.sort((a, b) => Number(b.ref.head) - Number(a.ref.head))
+    const shown = chips.length > MAX_CHIPS + 1 ? chips.slice(0, MAX_CHIPS) : chips
+    out.set(hash, { shown, rest: chips.slice(shown.length).map((c) => c.ref) })
+  }
+  return out
+})
+
 // Clicking a ref lands on its commit, wherever in the history that is.
 watch(
   () => props.reveal,
@@ -149,6 +189,68 @@ watch(
     else selected.value = r.hash
   },
 )
+
+// ---- search ---------------------------------------------------------------
+
+const finding = ref(false)
+const findInput = ref<HTMLInputElement | null>(null)
+const query = ref('')
+const matches = ref<number[]>([])
+const current = ref(0)
+
+const matchRows = computed(() => new Set(matches.value))
+
+async function runSearch() {
+  const q = query.value
+  matches.value = q ? await SearchCommits(props.repoId, q) : []
+  current.value = 0
+  if (matches.value.length) void goTo(0)
+}
+
+let timer: number | undefined
+watch(query, () => {
+  clearTimeout(timer)
+  timer = window.setTimeout(runSearch, 120)
+})
+
+/** Scrolls to the nth match and selects it, exactly as revealing a ref does. */
+async function goTo(n: number) {
+  const i = matches.value[n]
+  if (i === undefined) return
+
+  current.value = n
+  scrollTo(i)
+  await fetchPage(Math.floor(i / PAGE))
+  const entry = entryAt(i)
+  if (entry) select(entry)
+}
+
+/** Steps through the matches, wrapping at either end. */
+function step(d: number) {
+  const n = matches.value.length
+  if (!n) return
+  void goTo((current.value + d + n) % n)
+}
+
+function openFind() {
+  finding.value = true
+  void nextTick(() => findInput.value?.select())
+}
+
+function closeFind() {
+  finding.value = false
+  query.value = ''
+  matches.value = []
+}
+
+function onKey(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+    e.preventDefault()
+    openFind()
+  } else if (e.key === 'Escape' && finding.value) {
+    closeFind()
+  }
+}
 
 // ---- graph geometry -------------------------------------------------------
 
@@ -204,6 +306,7 @@ watch(
     pages.value = new Map()
     partial.clear()
     ensureVisiblePages()
+    void runSearch()
   },
 )
 
@@ -213,6 +316,7 @@ watch(
     pages.value = new Map()
     partial.clear()
     selected.value = ''
+    closeFind()
     if (viewport.value) viewport.value.scrollTop = 0
     scrollTop.value = 0
     ensureVisiblePages()
@@ -222,26 +326,53 @@ watch(
 let observer: ResizeObserver | null = null
 
 onMounted(() => {
+  window.addEventListener('keydown', onKey)
   if (!viewport.value) return
   viewportHeight.value = viewport.value.clientHeight
   observer = new ResizeObserver(() => {
     viewportHeight.value = viewport.value?.clientHeight ?? 0
+    gutter.value = viewport.value ? viewport.value.offsetWidth - viewport.value.clientWidth : 0
   })
   observer.observe(viewport.value)
   ensureVisiblePages()
 })
 
-onBeforeUnmount(() => observer?.disconnect())
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey)
+  observer?.disconnect()
+})
 </script>
 
 <template>
   <div class="commit-list" :style="{ '--graph-w': graphWidth + 'px' }">
-    <div class="header">
+    <div v-if="finding" class="find">
+      <input
+        ref="findInput"
+        v-model="query"
+        class="find-input"
+        placeholder="Search message, author or hash"
+        @keydown.enter.prevent="step($event.shiftKey ? -1 : 1)"
+      />
+      <span class="find-count muted">
+        {{ matches.length ? `${current + 1}/${matches.length}` : query ? 'none' : '' }}
+      </span>
+      <button class="find-btn" :disabled="!matches.length" title="Previous" @click="step(-1)">
+        <svg viewBox="0 0 12 12"><path d="M3 7.5L6 4.5 9 7.5" /></svg>
+      </button>
+      <button class="find-btn" :disabled="!matches.length" title="Next" @click="step(1)">
+        <svg viewBox="0 0 12 12"><path d="M3 4.5L6 7.5 9 4.5" /></svg>
+      </button>
+      <button class="find-btn" title="Close" @click="closeFind">
+        <svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" /></svg>
+      </button>
+    </div>
+
+    <div class="header" :style="{ paddingRight: 14 + gutter + 'px' }">
       <span></span>
       <span>Description</span>
-      <span>Author</span>
-      <span>Date</span>
-      <span>Commit</span>
+      <span class="col-author">Author</span>
+      <span class="col-date">Date</span>
+      <span class="col-hash">Commit</span>
     </div>
 
     <div ref="viewport" class="viewport" @scroll.passive="onScroll">
@@ -250,8 +381,15 @@ onBeforeUnmount(() => observer?.disconnect())
           <ContextMenuTrigger as-child :disabled="!row.entry">
             <div
               class="row"
-              :class="{ selected: row.entry && row.entry.commit.hash === selected }"
-              :style="{ transform: `translateY(${row.index * ROW}px)` }"
+              :class="{
+                selected: row.entry && row.entry.commit.hash === selected,
+                match: matchRows.has(row.index),
+                'match-current': matches[current] === row.index,
+              }"
+              :style="{
+                transform: `translateY(${row.index * ROW}px)`,
+                '--lane': row.entry ? laneColor(row.entry.graph.color) : undefined,
+              }"
               @click="row.entry && select(row.entry)"
             >
               <template v-if="row.entry">
@@ -275,10 +413,21 @@ onBeforeUnmount(() => observer?.disconnect())
                     :d="outPath(row.entry.graph.lane, l.lane)"
                     :stroke="laneColor(l.color)"
                   />
+                  <!-- Where you are: a ring around the dot, as Fork draws it. -->
+                  <circle
+                    v-if="row.entry.commit.hash === headHash"
+                    class="head-ring"
+                    :cx="x(row.entry.graph.lane)"
+                    :cy="MID"
+                    r="7.5"
+                    fill="none"
+                    :stroke="laneColor(row.entry.graph.color)"
+                    stroke-width="1.5"
+                  />
                   <circle
                     :cx="x(row.entry.graph.lane)"
                     :cy="MID"
-                    :r="row.entry.graph.merge ? 3.2 : 3.8"
+                    :r="row.entry.graph.merge ? 3.6 : 4.2"
                     :fill="row.entry.graph.merge ? 'var(--bg)' : laneColor(row.entry.graph.color)"
                     :stroke="laneColor(row.entry.graph.color)"
                     stroke-width="2"
@@ -286,26 +435,53 @@ onBeforeUnmount(() => observer?.disconnect())
                 </svg>
 
                 <span class="col-subject">
-                  <span
-                    v-for="r in props.refsByHash.get(row.entry.commit.hash) ?? []"
-                    :key="r.name"
-                    class="badge"
-                    :class="r.kind"
-                  >
-                    <!-- The checked out branch shows a tick where the others show their kind. -->
-                    <span v-if="r.head" class="head">✓</span>
-                    <RefIcon
-                      v-else
-                      :kind="r.kind === 'remote' ? 'remote' : r.kind === 'tag' ? 'tag' : 'branch'"
-                    />
-                    {{ r.short }}
-                  </span>
+                  <template v-if="chipsByHash.get(row.entry.commit.hash)">
+                    <span
+                      v-for="c in chipsByHash.get(row.entry.commit.hash)!.shown"
+                      :key="c.ref.name"
+                      class="badge"
+                      :class="[c.ref.kind, { current: c.ref.head }]"
+                      :title="
+                        c.synced ? `${c.ref.short} · ${c.ref.upstream || 'origin'}` : undefined
+                      "
+                    >
+                      <RefIcon
+                        :kind="
+                          c.ref.kind === 'remote'
+                            ? 'remote'
+                            : c.ref.kind === 'tag'
+                              ? 'tag'
+                              : 'branch'
+                        "
+                      />
+                      {{ c.ref.short }}
+                      <RefIcon v-if="c.synced" kind="remote" class="synced" />
+                    </span>
+                    <span
+                      v-if="chipsByHash.get(row.entry.commit.hash)!.rest.length"
+                      class="badge more"
+                      :title="
+                        chipsByHash
+                          .get(row.entry.commit.hash)!
+                          .rest.map((r) => r.short)
+                          .join('\n')
+                      "
+                    >
+                      +{{ chipsByHash.get(row.entry.commit.hash)!.rest.length }}
+                    </span>
+                  </template>
                   <span class="subject-text">{{ row.entry.commit.subject }}</span>
                 </span>
 
-                <span class="col-author muted">{{ row.entry.commit.author.name }}</span>
-                <span class="col-date muted">{{ formatDate(row.entry.commit.author.when) }}</span>
-                <span class="col-hash mono muted">{{ row.entry.commit.hash.slice(0, 7) }}</span>
+                <span class="col-author">
+                  <AuthorMark
+                    :name="row.entry.commit.author.name"
+                    :email="row.entry.commit.author.email"
+                  />
+                  <span class="author-name">{{ row.entry.commit.author.name }}</span>
+                </span>
+                <span class="col-date">{{ formatDate(row.entry.commit.author.when, false) }}</span>
+                <span class="col-hash">{{ row.entry.commit.hash.slice(0, 7) }}</span>
               </template>
 
               <!-- The page for this row has not arrived yet. -->
@@ -343,6 +519,13 @@ onBeforeUnmount(() => observer?.disconnect())
               </ContextMenuItem>
 
               <ContextMenuSeparator class="menu-sep" />
+              <ContextMenuItem
+                class="menu-item"
+                :disabled="!head"
+                @select="emit('rebase', row.entry!.commit.hash)"
+              >
+                Rebase {{ head || 'HEAD' }} on this commit
+              </ContextMenuItem>
               <!-- A reset moves a branch, so there has to be one to move. -->
               <ContextMenuItem
                 class="menu-item danger"
@@ -370,18 +553,22 @@ onBeforeUnmount(() => observer?.disconnect())
 .header,
 .row {
   display: grid;
-  grid-template-columns: var(--graph-w) 1fr 140px 110px 70px;
+  /* Sized from --fs, not em, so the smaller header font keeps the same columns as the rows. */
+  grid-template-columns: var(--graph-w) 1fr calc(var(--fs) * 10.5) calc(var(--fs) * 8.5) calc(
+      var(--fs) * 4.5
+    );
   align-items: center;
-  gap: 8px;
-  padding: 0 10px;
+  gap: 16px;
+  padding: 0 14px;
 }
 
 .header {
-  height: 26px;
+  height: 32px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-raised);
-  color: var(--text-muted);
-  font-size: var(--fs-small);
+  background: var(--bg);
+  color: var(--text-dim);
+  font-size: calc(var(--fs-small) - 1px);
+  font-weight: 500;
   flex: none;
 }
 
@@ -401,30 +588,107 @@ onBeforeUnmount(() => observer?.disconnect())
   top: 0;
   left: 0;
   right: 0;
-  height: 24px;
+  height: 30px;
   white-space: nowrap;
   cursor: default;
 }
 
 .row:hover {
+  background: color-mix(in srgb, var(--bg-hover) 70%, transparent);
+}
+
+/* The selected row's edge takes its branch's colour, tying the row to the graph. */
+.row.selected {
+  background: var(--bg-selected);
+  box-shadow: inset 3px 0 0 var(--lane, var(--text-muted));
+}
+
+.row.match {
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+}
+
+.row.match-current {
+  background: color-mix(in srgb, var(--amber) 30%, transparent);
+}
+
+.find {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.find-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  color: inherit;
+  font: inherit;
+  background: var(--bg-shell);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: none;
+}
+
+.find-input:focus {
+  border-color: var(--accent);
+}
+
+.find-count {
+  min-width: 48px;
+  text-align: right;
+}
+
+.find-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: inherit;
+  cursor: default;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+}
+
+.find-btn:hover:not(:disabled) {
   background: var(--bg-hover);
 }
 
-.row.selected {
-  background: var(--bg-selected);
+.find-btn svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.find-btn:disabled {
+  opacity: 0.4;
 }
 
 /* The lines are drawn open; only the dot is filled. */
+/* The ring around HEAD on the first lane reaches past the column's left edge. */
+.graph {
+  overflow: visible;
+}
+
 .graph path {
   fill: none;
-  stroke-width: 1.6;
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 
 /* Flex, so the badges sit centred against the subject instead of on its baseline. */
 .col-subject {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   min-width: 0;
   overflow: hidden;
 }
@@ -436,57 +700,99 @@ onBeforeUnmount(() => observer?.disconnect())
 }
 
 .col-author,
-.col-date {
+.col-date,
+.col-hash {
   overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: var(--fs-small);
 }
 
-/* The glyph says which kind it is, the colour says it from further away. */
+.row .col-author,
+.row .col-date,
+.row .col-hash {
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.row .col-author {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.author-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row .col-hash {
+  font-family: var(--font-mono);
+  font-size: calc(var(--fs-small) - 1px);
+  color: var(--text-dim);
+}
+
+/* Branches tinted in their lane colour, remotes outlined, tags neutral; filled when checked out. */
 .badge {
   display: inline-flex;
   align-items: center;
   flex: none;
   gap: 5px;
-  height: 18px;
-  padding: 0 9px;
+  height: 19px;
+  padding: 0 7px 0 6px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: calc(var(--fs-small) - 1px);
+  font-weight: 600;
   line-height: 1;
-  background: var(--bg);
-  border: 1px solid var(--border-strong);
   color: var(--text);
+  background: color-mix(in srgb, var(--lane) 18%, transparent);
 }
 
 .badge .ref-icon {
   width: 11px;
   height: 11px;
+  color: var(--lane);
 }
 
-/* The colour is on the border and the glyph; the name stays as readable as the subject. */
-.badge.branch {
-  border-color: var(--green);
-}
-
-.badge.branch .ref-icon {
-  color: var(--green);
+.badge.remote {
+  background: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lane) 55%, transparent);
+  font-weight: 500;
 }
 
 .badge.tag {
-  border-color: var(--amber);
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 .badge.tag .ref-icon {
-  color: var(--amber);
+  color: var(--text-dim);
 }
 
-.badge.remote .ref-icon {
+/* The globe after a branch name: its remote sits on the same commit. */
+.badge .ref-icon.synced {
+  width: 12px;
+  height: 12px;
+  margin-left: 1px;
+  stroke-width: 1.5;
+}
+
+.badge.more {
+  padding: 0 6px;
+  background: var(--bg-hover);
   color: var(--text-muted);
+  font-weight: 500;
 }
 
-.badge .head {
-  color: var(--green);
-  font-weight: 700;
+.badge.current {
+  background: var(--lane);
+  color: var(--bg);
+}
+
+.badge.current .ref-icon {
+  color: var(--bg);
 }
 
 .placeholder {

@@ -9,6 +9,7 @@ import {
   CheckoutCommit,
   CherryPick,
   CloneRepo,
+  CloseRepo,
   ConflictText,
   Conflicts,
   CreateBranch,
@@ -30,6 +31,7 @@ import {
   Pull,
   Push,
   PushTag,
+  Rebase,
   Refs,
   RemoveRemote,
   RenameBranch,
@@ -37,6 +39,7 @@ import {
   ResolveConflict,
   ResolveLines,
   Revert,
+  SkipOperation,
   SelectRepo,
   StageFiles,
   Stash,
@@ -50,6 +53,8 @@ import { errorText } from '@/utils/errors'
 /** The frontend's whole picture of the open repository. */
 interface State {
   info: session.Info | null
+  /** Every open repository, in the order their tabs were opened. */
+  tabs: session.Info[]
   count: number
   /** Lanes the graph column needs; grows as more of the history arrives. */
   width: number
@@ -74,6 +79,7 @@ interface State {
 
 const state = reactive<State>({
   info: null,
+  tabs: [],
   count: 0,
   width: 1,
   gen: 0,
@@ -145,11 +151,45 @@ function reset() {
   state.conflicts = []
 }
 
+/** Makes info the shown repository, adding its tab the first time. */
+function adopt(info: session.Info) {
+  state.info = info
+  if (!state.tabs.some((t) => t.id === info.id)) state.tabs.push(info)
+}
+
+/** Shows an already open repository; Go still holds its history. */
+async function switchTo(id: string) {
+  if (state.info?.id === id) return
+  const tab = state.tabs.find((t) => t.id === id)
+  if (!tab) return
+
+  state.info = tab
+  state.error = ''
+  reset()
+  await refresh()
+}
+
+/** Closes one repository, freeing the cache Go holds for it. */
+async function close(id: string) {
+  const i = state.tabs.findIndex((t) => t.id === id)
+  if (i < 0) return
+
+  state.tabs.splice(i, 1)
+  void CloseRepo(id)
+  if (state.info?.id !== id) return
+
+  // The neighbour on the right, or the one on the left when this was the last.
+  const next = state.tabs[i] ?? state.tabs[i - 1]
+  state.info = next ?? null
+  reset()
+  if (next) await refresh()
+}
+
 async function open(path: string) {
   state.error = ''
   state.initCandidate = ''
   try {
-    state.info = await OpenRepo(path)
+    adopt(await OpenRepo(path))
     reset()
     state.loading = true
     // A repository already open returns immediately with its history cached and emits no.
@@ -174,7 +214,7 @@ async function initHere() {
   if (!path) return
   state.error = ''
   try {
-    state.info = await InitRepo(path)
+    adopt(await InitRepo(path))
     state.initCandidate = ''
     reset()
     await refresh()
@@ -194,8 +234,7 @@ async function clone(opts: git.CloneOptions): Promise<boolean> {
   state.initCandidate = ''
   return working(async () => {
     try {
-      const info = await CloneRepo(opts)
-      state.info = info
+      adopt(await CloneRepo(opts))
       reset()
       state.loading = true
       await refresh()
@@ -364,8 +403,14 @@ async function run<T>(fn: (id: string) => Promise<T>): Promise<T | null> {
   }
 }
 
+/** Rebases and returns what it turned out to be, or null when git refused. */
+async function rebase(opts: git.RebaseOptions): Promise<git.RebaseResult | null> {
+  return working(() => run((id) => Rebase(id, opts)))
+}
+
 const abortOperation = () => act((id) => AbortOperation(id))
 const finishOperation = (message: string) => act((id) => FinishOperation(id, message))
+const skipOperation = () => act((id) => SkipOperation(id))
 const resolveConflict = (path: string, side: 'ours' | 'theirs') =>
   act((id) => ResolveConflict(id, path, side))
 
@@ -422,6 +467,8 @@ export function useRepo() {
     state,
     refsByHash,
     open,
+    switchTo,
+    close,
     browse,
     refresh,
     initHere,
@@ -445,6 +492,7 @@ export function useRepo() {
     fetchAll,
     push,
     merge,
+    rebase,
     previewMerge,
     pull,
     revert,
@@ -453,6 +501,7 @@ export function useRepo() {
     previewReset,
     abortOperation,
     finishOperation,
+    skipOperation,
     resolveConflict,
     conflictText,
     resolveLines,

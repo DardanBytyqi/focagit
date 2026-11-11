@@ -9,11 +9,7 @@ import type {
   TagRequest,
 } from '@/types'
 
-/**
- * Which windows are open. Kept in one place because they are not independent:
- * only one belongs on screen at a time, and the status bar needs to know that
- * anything is open at all.
- */
+/**Which windows are open. Kept in one place because they are not independent*/
 const open = reactive({
   clone: false,
   identity: false,

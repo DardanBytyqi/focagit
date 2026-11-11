@@ -199,7 +199,7 @@ func TestAppearance(t *testing.T) {
 		t.Errorf("Appearance() = %+v, want the default", got)
 	}
 
-	want := Appearance{Theme: "light", FontSize: 15}
+	want := Appearance{Theme: "light", FontSize: 15, Font: "default"}
 	if err := s.SaveAppearance(want); err != nil {
 		t.Fatalf("SaveAppearance: %v", err)
 	}

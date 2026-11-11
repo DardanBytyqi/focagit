@@ -12,8 +12,8 @@ import {
 } from 'reka-ui'
 
 const props = defineProps<{
-  /** dot is a colour, for choices that carry a warning of their own. */
-  options: { value: string; label: string; hint?: string; dot?: string }[]
+  /** dot is a colour, for choices that carry a warning of their own; font previews the choice itself. */
+  options: { value: string; label: string; hint?: string; dot?: string; font?: string }[]
   placeholder?: string
 }>()
 
@@ -27,7 +27,10 @@ const current = computed(() => props.options.find((o) => o.value === value.value
   <SelectRoot v-model="value">
     <SelectTrigger class="trigger">
       <span v-if="current?.dot" class="dot" :style="{ background: current.dot }"></span>
-      <SelectValue :placeholder="placeholder ?? ''" />
+      <SelectValue
+        :placeholder="placeholder ?? ''"
+        :style="current?.font ? { fontFamily: current.font } : undefined"
+      />
       <span class="chevron">▾</span>
     </SelectTrigger>
 
@@ -36,7 +39,9 @@ const current = computed(() => props.options.find((o) => o.value === value.value
         <SelectViewport>
           <SelectItem v-for="o in options" :key="o.value" :value="o.value" class="item">
             <span v-if="o.dot" class="dot" :style="{ background: o.dot }"></span>
-            <SelectItemText>{{ o.label }}</SelectItemText>
+            <SelectItemText :style="o.font ? { fontFamily: o.font } : undefined">{{
+              o.label
+            }}</SelectItemText>
             <span v-if="o.hint" class="hint mono">{{ o.hint }}</span>
           </SelectItem>
         </SelectViewport>

@@ -32,14 +32,30 @@ function start(e: MouseEvent) {
 </template>
 
 <style scoped>
+/* A hairline you can grab: the hit area is wider than the line it draws. */
 .splitter {
-  height: 5px;
-  background: var(--border);
+  position: relative;
+  height: 7px;
+  margin: -3px 0;
   cursor: row-resize;
   flex: none;
+  z-index: var(--z-float);
 }
 
-.splitter:hover {
+.splitter::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 3px;
+  height: 1px;
+  background: var(--border);
+  transition: background 0.1s ease;
+}
+
+.splitter:hover::after {
+  height: 2px;
+  top: 2.5px;
   background: var(--accent);
 }
 </style>

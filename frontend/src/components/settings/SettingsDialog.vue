@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import AppearanceSettings from '@/components/settings/AppearanceSettings.vue'
 import Modal from '@/components/common/Modal.vue'
+import ShortcutSettings from '@/components/settings/ShortcutSettings.vue'
 import SSHSettings from '@/components/settings/SSHSettings.vue'
 
 const props = defineProps<{ open: boolean; section: string }>()
@@ -10,6 +11,7 @@ const emit = defineEmits<{ close: [] }>()
 /** Add a section here and it appears in the list; nothing else to wire. */
 const sections = [
   { key: 'appearance', title: 'Appearance' },
+  { key: 'shortcuts', title: 'Shortcuts' },
   { key: 'ssh', title: 'SSH keys' },
 ]
 
@@ -48,6 +50,10 @@ watch(
       <!-- Both stay mounted so switching back is instant. -->
       <div class="body">
         <AppearanceSettings v-show="current === 'appearance'" />
+        <ShortcutSettings
+          v-show="current === 'shortcuts'"
+          :active="open && current === 'shortcuts'"
+        />
         <SSHSettings v-show="current === 'ssh'" :active="open && current === 'ssh'" />
       </div>
     </div>

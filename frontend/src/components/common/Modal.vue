@@ -53,11 +53,11 @@ const open = defineModel<boolean>('open', { required: true })
   height: fit-content;
   max-height: 76vh;
   overflow-y: auto;
-  padding: 16px;
+  padding: 20px 22px;
   background: var(--bg-raised);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  box-shadow: 0 12px 32px var(--shadow);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 40px var(--shadow);
 }
 
 /* A set height, so the panes inside get the same room whatever the content is. */
@@ -75,8 +75,8 @@ const open = defineModel<boolean>('open', { required: true })
 }
 
 .dialog .title {
-  margin: 0 0 12px;
-  font-size: 14px;
+  margin: 0 0 16px;
+  font-size: calc(var(--fs) + 2px);
   font-weight: 600;
 }
 
@@ -110,39 +110,47 @@ const open = defineModel<boolean>('open', { required: true })
   margin-top: 5px;
 }
 
-.dialog input[type='text'] {
+.dialog input[type='text'],
+.dialog input[type='password'] {
   width: 100%;
-  padding: 6px 8px;
+  height: 36px;
+  padding: 0 11px;
   font: inherit;
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: var(--radius);
   user-select: text;
+  transition:
+    border-color 0.1s ease,
+    box-shadow 0.1s ease;
 }
 
-.dialog input[type='text']:focus {
+.dialog input[readonly] {
+  color: var(--text-muted);
+}
+
+.dialog input[type='text']:focus,
+.dialog input[type='password']:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--text-dim);
 }
 
 .dialog .actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
-.dialog .actions .primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+.dialog .actions button {
+  height: 34px;
+  padding: 0 16px;
 }
 
-.dialog .actions .primary:hover:not(:disabled) {
-  filter: brightness(1.1);
-  background: var(--accent);
-  border-color: var(--accent);
+.dialog .actions button:not(.primary):not(.danger) {
+  background: var(--bg-hover);
+  border-color: var(--border);
 }
 
 .dialog .actions .danger {

@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -206,6 +207,30 @@ func (r *Repo) Range(offset, count int) []Entry {
 	return out
 }
 
+// Search returns the rows whose commit matches q, in history order.
+func (r *Repo) Search(q string) []int {
+	q = strings.ToLower(strings.TrimSpace(q))
+	out := []int{}
+	if q == "" {
+		return out
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for i, e := range r.entries {
+		c := e.Commit
+		if strings.HasPrefix(c.Hash, q) ||
+			strings.Contains(strings.ToLower(c.Subject), q) ||
+			strings.Contains(strings.ToLower(c.Body), q) ||
+			strings.Contains(strings.ToLower(c.Author.Name), q) ||
+			strings.Contains(strings.ToLower(c.Author.Email), q) {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 // IndexOf is the row a commit sits on, or -1 when the history does not hold it.
 func (r *Repo) IndexOf(hash string) int {
 	r.mu.RLock()
@@ -269,6 +294,10 @@ func (r *Repo) Unstage(ctx context.Context, paths ...string) error {
 
 func (r *Repo) Discard(ctx context.Context, paths ...string) error {
 	return r.git.Discard(ctx, paths...)
+}
+
+func (r *Repo) AddToGitignore(path string) error {
+	return r.git.AddToGitignore(path)
 }
 
 // StageLines stages or unstages individual lines of one file.
@@ -406,7 +435,13 @@ func (r *Repo) Pull(ctx context.Context, opts git.PullOptions, onProgress func(s
 	return r.git.Pull(ctx, opts, onProgress)
 }
 
+func (r *Repo) Rebase(ctx context.Context, opts git.RebaseOptions) (git.RebaseResult, error) {
+	return r.git.Rebase(ctx, opts)
+}
+
 func (r *Repo) AbortOperation(ctx context.Context) error { return r.git.AbortOperation(ctx) }
+
+func (r *Repo) SkipOperation(ctx context.Context) error { return r.git.SkipOperation(ctx) }
 
 func (r *Repo) FinishOperation(ctx context.Context, message string) error {
 	return r.git.FinishOperation(ctx, message)

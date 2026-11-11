@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+# A newer push to the same branch cancels the run still going on it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Ubuntu 24.04 ships webkit2gtk 4.1 only, like Fedora, hence the build tag below.
+      - name: Install GTK and WebKit
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+
+      # The tests commit into scratch repositories, so git needs an identity.
+      - name: Configure git
+        run: |
+          git config --global user.name "focagit CI"
+          git config --global user.email "ci@focagit.invalid"
+
+      - name: gofmt
+        run: test -z "$(gofmt -l $(git ls-files '*.go') | tee /dev/stderr)"
+
+      - name: Install frontend
+        working-directory: frontend
+        run: npm ci
+
+      - name: Prettier
+        working-directory: frontend
+        run: npm run format:check
+
+      # Generates the bindings, type-checks the frontend and fills frontend/dist for go:embed.
+      - name: Build
+        run: wails build -tags webkit2_41
+
+      - name: go vet
+        run: go vet -tags webkit2_41 ./...
+
+      - name: go test
+        run: go test -race -tags webkit2_41 ./...

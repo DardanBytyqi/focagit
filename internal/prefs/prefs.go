@@ -37,11 +37,13 @@ type Appearance struct {
 	Theme string `json:"theme"`
 	// FontSize is the base size in pixels; everything else is relative to it.
 	FontSize int `json:"fontSize"`
+	// Font is "default" (Inter), "system", "redhat", "spacemono" or "plexmono".
+	Font string `json:"font"`
 }
 
 // DefaultAppearance is what a fresh installation looks like.
 func DefaultAppearance() Appearance {
-	return Appearance{Theme: "dark", FontSize: 13}
+	return Appearance{Theme: "dark", FontSize: 14, Font: "default"}
 }
 
 // normalise replaces anything unrecognised with the default.
@@ -55,6 +57,11 @@ func (a Appearance) normalise() Appearance {
 	if a.FontSize < 10 || a.FontSize > 20 {
 		a.FontSize = def.FontSize
 	}
+	switch a.Font {
+	case "default", "system", "redhat", "spacemono", "plexmono":
+	default:
+		a.Font = def.Font
+	}
 	return a
 }
 
@@ -63,6 +70,8 @@ type Data struct {
 	Recents    []Recent   `json:"recents"`
 	Identities []Identity `json:"identities"`
 	Appearance Appearance `json:"appearance"`
+	// Shortcuts holds only the bindings that differ from the defaults.
+	Shortcuts map[string]string `json:"shortcuts"`
 }
 
 // Store is the config file, guarded so the Wails bridge can call it from anywhere.
@@ -82,7 +91,7 @@ func Open() (*Store, error) {
 }
 
 func openAt(path string) (*Store, error) {
-	s := &Store{path: path, data: Data{Recents: []Recent{}, Identities: []Identity{}}}
+	s := &Store{path: path, data: Data{Recents: []Recent{}, Identities: []Identity{}, Shortcuts: map[string]string{}}}
 
 	b, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -93,7 +102,7 @@ func openAt(path string) (*Store, error) {
 	}
 	// A corrupt file must not stop the app from starting; start over instead.
 	if err := json.Unmarshal(b, &s.data); err != nil {
-		s.data = Data{Recents: []Recent{}, Identities: []Identity{}}
+		s.data = Data{Recents: []Recent{}, Identities: []Identity{}, Shortcuts: map[string]string{}}
 		return s, nil
 	}
 	if s.data.Recents == nil {
@@ -101,6 +110,9 @@ func openAt(path string) (*Store, error) {
 	}
 	if s.data.Identities == nil {
 		s.data.Identities = []Identity{}
+	}
+	if s.data.Shortcuts == nil {
+		s.data.Shortcuts = map[string]string{}
 	}
 	return s, nil
 }
@@ -201,6 +213,30 @@ func (s *Store) SaveAppearance(a Appearance) error {
 	defer s.mu.Unlock()
 
 	s.data.Appearance = a.normalise()
+	return s.save()
+}
+
+// Shortcuts returns the bindings that differ from the defaults.
+func (s *Store) Shortcuts() map[string]string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	out := make(map[string]string, len(s.data.Shortcuts))
+	for action, combo := range s.data.Shortcuts {
+		out[action] = combo
+	}
+	return out
+}
+
+// SaveShortcuts stores the bindings that differ from the defaults.
+func (s *Store) SaveShortcuts(m map[string]string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if m == nil {
+		m = map[string]string{}
+	}
+	s.data.Shortcuts = m
 	return s.save()
 }
 

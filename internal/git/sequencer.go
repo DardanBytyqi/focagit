@@ -27,6 +27,7 @@ const (
 	OpMerge      Operation = "merge"
 	OpRevert     Operation = "revert"
 	OpCherryPick Operation = "cherry-pick"
+	OpRebase     Operation = "rebase"
 )
 
 // opHeads is the file git leaves in .git for each one, most specific first.
@@ -41,6 +42,10 @@ var opHeads = []struct {
 
 // Operation reports what is half-finished, and the commit it is applying.
 func (r *Repo) Operation() (Operation, string) {
+	// Asked first: a rebase is open as long as its directory is, even between commits.
+	if dir := r.rebaseDir(); dir != "" {
+		return OpRebase, r.rebaseStopped(dir)
+	}
 	for _, h := range opHeads {
 		b, err := os.ReadFile(filepath.Join(r.gitDir, h.file))
 		if err != nil {
@@ -57,6 +62,9 @@ func (r *Repo) Operation() (Operation, string) {
 func (r *Repo) operationFrom(ctx context.Context, op Operation, hash string) string {
 	if op == OpMerge {
 		return r.MergeSource(ctx)
+	}
+	if hash == "" {
+		return ""
 	}
 	out, err := r.run.outputQuiet(ctx, "log", "-1", "--format=%h %s", hash)
 	if line := strings.TrimSpace(string(out)); err == nil && line != "" {
@@ -178,8 +186,7 @@ func (r *Repo) FinishOperation(ctx context.Context, message string) error {
 
 	if op != OpMerge {
 		// --continue keeps the message git prepared; there is no way to pass another.
-		_, err := r.run.output(ctx, string(op), "--continue")
-		return err
+		return r.proceed(ctx, op, "--continue")
 	}
 
 	args := []string{"commit"}
@@ -190,6 +197,33 @@ func (r *Repo) FinishOperation(ctx context.Context, message string) error {
 		args = append(args, "--no-edit")
 	}
 	_, err = r.run.output(ctx, args...)
+	return err
+}
+
+// SkipOperation drops the commit being replayed and moves on to the next one.
+func (r *Repo) SkipOperation(ctx context.Context) error {
+	switch op, _ := r.Operation(); op {
+	case OpNone:
+		return ErrNoOperation
+	case OpMerge:
+		return errors.New("a merge has no commit to skip")
+	default:
+		return r.proceed(ctx, op, "--skip")
+	}
+}
+
+// proceed moves an operation on by one commit; stopping on the next conflict is not a failure.
+func (r *Repo) proceed(ctx context.Context, op Operation, flag string) error {
+	_, err := r.run.outputQuiet(ctx, string(op), flag)
+	if err == nil {
+		return nil
+	}
+	if op == OpRebase && r.rebaseDir() != "" {
+		if paths, perr := r.ConflictPaths(ctx); perr == nil && len(paths) > 0 {
+			return nil
+		}
+	}
+	r.run.log.Error("git failed", "cmd", string(op)+" "+flag, "err", err)
 	return err
 }
 

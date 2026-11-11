@@ -227,7 +227,7 @@ async function copyKey(text: string) {
 .add-link {
   margin-top: 8px;
   padding: 4px 0;
-  color: var(--accent);
+  color: var(--blue);
   background: none;
   border: none;
 }

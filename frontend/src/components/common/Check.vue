@@ -89,7 +89,7 @@ const checked = defineModel<boolean>({ required: true })
   width: 11px;
   height: 11px;
   fill: none;
-  stroke: #fff;
+  stroke: var(--bg);
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;

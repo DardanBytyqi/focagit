@@ -27,6 +27,9 @@ func (r *Repo) Status(ctx context.Context) (Status, error) {
 	if op, hash := r.Operation(); op != OpNone {
 		st.Operation = op
 		st.OperationFrom = r.operationFrom(ctx, op, hash)
+		if op == OpRebase {
+			st.Rebase = r.RebaseState(ctx)
+		}
 	}
 	return st, nil
 }
