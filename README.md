@@ -1,7 +1,12 @@
 # focagit
 
-A desktop Git client for Linux and macOS
-Go - Wails - Vue
+A lightweight (~4.5 MB) desktop Git client for Linux, written in Go.
+
+Go · Wails · Vue
+
+![Commit history with the branch graph and the diff of the selected commit](.github/screenshots/history.png)
+
+![Changes view with staging, the file diff and the commit form](.github/screenshots/changes.png)
 
 ## Development
 
