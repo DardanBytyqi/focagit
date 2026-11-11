@@ -25,12 +25,12 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # Plain HTTP to the Ubuntu mirrors can hang on the runners, so fetch them over HTTPS.
+      # Canonical's archive can be unreachable from the runners, so use the kernel.org mirror instead.
       - name: Install GTK and WebKit
         timeout-minutes: 12
         run: |
           sudo find /etc/apt -type f \( -name '*.list' -o -name '*.sources' -o -name 'apt-mirrors.txt' \) \
-            -exec sed -i -E 's#http://(azure\.)?(archive|security)\.ubuntu\.com#https://\2.ubuntu.com#g' {} +
+            -exec sed -i -E 's#https?://(azure\.)?(archive|security)\.ubuntu\.com/ubuntu#https://mirrors.edge.kernel.org/ubuntu#g' {} +
           APT="sudo apt-get -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o Acquire::Retries=2"
           for i in 1 2 3; do
             timeout 180 $APT update && timeout 300 $APT install -y libgtk-3-dev libwebkit2gtk-4.1-dev && exit 0
