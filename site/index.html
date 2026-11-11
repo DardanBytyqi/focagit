@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>focagit · a lightweight Git client for Linux</title>
+    <meta name="description" content="A lightweight (~4.5 MB) desktop Git client for Linux, written in Go." />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <nav>
+      <a class="brand" href="./">
+        <img src="icon.svg" alt="" width="36" height="36" />
+        focagit
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/DardanBytyqi/focagit">GitHub ↗</a>
+      </div>
+    </nav>
+
+    <main>
+      <header class="hero">
+        <h1>A lightweight Git client for Linux.</h1>
+        <p class="sub">A fast, focused Git client that does the daily work and nothing more.</p>
+        <div class="actions">
+          <a class="btn primary" href="https://github.com/DardanBytyqi/focagit/releases/latest">Download ↗</a>
+          <a class="btn" href="https://github.com/DardanBytyqi/focagit">Source ↗</a>
+        </div>
+        <p class="meta">Free · .deb · .rpm · .tar.gz</p>
+        <img class="shot" src="history.png" alt="focagit showing the commit history with the branch graph" width="1440" height="900" />
+      </header>
+
+      <section id="features" class="band">
+        <p class="eyebrow">Features</p>
+        <h2>Everything you use daily.</h2>
+        <p class="comment">// and nothing you don't</p>
+        <ul class="grid">
+          <li>
+            <span class="dot" style="background: var(--blue)"></span>
+            <h3>Written in Go</h3>
+            <p>Wails and Vue, no Electron</p>
+          </li>
+          <li>
+            <span class="dot" style="background: var(--amber)"></span>
+            <h3>Lightweight</h3>
+            <p>~4.5 MB package</p>
+          </li>
+          <li>
+            <span class="dot" style="background: var(--violet)"></span>
+            <h3>Minimal</h3>
+            <p>A clean UI with no bloated features</p>
+          </li>
+          <li>
+            <span class="dot" style="background: var(--green)"></span>
+            <h3>Tabs</h3>
+            <p>Several repos open at once</p>
+          </li>
+          <li>
+            <span class="dot" style="background: var(--pink)"></span>
+            <h3>Conflict resolver</h3>
+            <p>Pick ours or theirs, line by line</p>
+          </li>
+          <li>
+            <span class="dot" style="background: var(--cyan)"></span>
+            <h3>Open source</h3>
+            <p>Read, build and fork it on GitHub</p>
+          </li>
+        </ul>
+        <img class="shot" src="changes.png" alt="focagit showing the changes view with a diff and the commit form" width="1440" height="900" />
+      </section>
+
+      <section id="install">
+        <h2>Install</h2>
+        <p class="sub">Grab a package from the <a href="https://github.com/DardanBytyqi/focagit/releases/latest">latest release</a>, then:</p>
+        <pre><code><span class="c"># Fedora, RHEL</span>
+sudo dnf install ./focagit-*.x86_64.rpm
+
+<span class="c"># Debian, Ubuntu</span>
+sudo apt install ./focagit_*_amd64.deb</code></pre>
+        <p class="note">Or just double-click the package to install it from your software center.</p>
+      </section>
+    </main>
+
+    <footer>
+      <span class="muted">$ like Fork, but lighter</span>
+    </footer>
+  </body>
+</html>
