@@ -179,7 +179,7 @@ async function keepAsIs() {
           :title="c.path"
           @click="select(c.path)"
         >
-          {{ c.path }}
+          <span dir="ltr">{{ c.path }}</span>
         </button>
       </nav>
 

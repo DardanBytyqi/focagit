@@ -121,7 +121,7 @@ function statusLabel(f: git.FileChange): string {
           >
             <span class="status" :class="'s-' + statusLabel(f)">{{ statusLabel(f) }}</span>
             <span class="path" :title="f.oldPath ? `${f.oldPath} → ${f.path}` : f.path">
-              {{ f.path }}
+              <span dir="ltr">{{ f.path }}</span>
             </span>
             <span v-if="f.oldPath" class="renamed muted">← {{ f.oldPath }}</span>
           </div>
@@ -323,7 +323,7 @@ function statusLabel(f: git.FileChange): string {
 .path {
   overflow: hidden;
   text-overflow: ellipsis;
-  /* Long paths matter at the end, not the start. */
+  /* Long paths matter at the end, not the start; the inner ltr span keeps a leading dot in place. */
   direction: rtl;
   text-align: left;
 }

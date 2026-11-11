@@ -115,7 +115,7 @@ func TestLogAgainstRealRepo(t *testing.T) {
 		t.Fatalf("got %d commits, want 5: %+v", len(commits), commits)
 	}
 
-	// --topo-order puts children before parents.
+	// --date-order puts children before parents.
 	if !commits[0].IsMerge() {
 		t.Errorf("first commit %q is not a merge", commits[0].Subject)
 	}

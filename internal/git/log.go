@@ -66,11 +66,11 @@ func (o LogOptions) args() []string {
 	return a
 }
 
-// Log streams commits to fn in topological order as git produces them.
+// Log streams commits to fn newest first, children before parents, as git produces them.
 func (r *Repo) Log(ctx context.Context, opts LogOptions, fn func(Commit) error) error {
 	args := append([]string{
 		"log",
-		"--topo-order",
+		"--date-order",
 		"--format=" + logFormat,
 	}, opts.args()...)
 
