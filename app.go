@@ -359,6 +359,15 @@ func (a *App) DiscardFiles(id string, paths []string) error {
 	return repo.Discard(a.ctx, paths...)
 }
 
+// AddToGitignore appends a path to the repository's root .gitignore.
+func (a *App) AddToGitignore(id, path string) error {
+	repo, err := a.session.Get(id)
+	if err != nil {
+		return err
+	}
+	return repo.AddToGitignore(path)
+}
+
 // StageLines stages or unstages a selection of lines within one file.
 func (a *App) StageLines(id, path string, refs []patch.LineRef, unstage bool) error {
 	repo, err := a.session.Get(id)

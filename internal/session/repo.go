@@ -296,6 +296,10 @@ func (r *Repo) Discard(ctx context.Context, paths ...string) error {
 	return r.git.Discard(ctx, paths...)
 }
 
+func (r *Repo) AddToGitignore(path string) error {
+	return r.git.AddToGitignore(path)
+}
+
 // StageLines stages or unstages individual lines of one file.
 func (r *Repo) StageLines(ctx context.Context, path string, refs []patch.LineRef, unstage bool) error {
 	// Staging reads the unstaged diff; unstaging reads the staged one.

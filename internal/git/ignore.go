@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -30,4 +31,34 @@ func (r *Repo) IgnoredDirs(ctx context.Context) ([]string, error) {
 		}
 	}
 	return dirs, nil
+}
+
+// AddToGitignore appends a path to the root .gitignore, creating it if needed.
+func (r *Repo) AddToGitignore(path string) error {
+	rel := filepath.ToSlash(path)
+	gi := filepath.Join(r.root, ".gitignore")
+
+	b, err := os.ReadFile(gi)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if line == rel {
+			return nil
+		}
+	}
+
+	f, err := os.OpenFile(gi, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if len(b) > 0 && !strings.HasSuffix(string(b), "\n") {
+		if _, err := f.WriteString("\n"); err != nil {
+			return err
+		}
+	}
+	_, err = f.WriteString(rel + "\n")
+	return err
 }

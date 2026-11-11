@@ -18,6 +18,7 @@ const emit = defineEmits<{
   toggleDir: [path: string]
   action: [node: TreeNode]
   discard: [node: TreeNode]
+  ignore: [node: TreeNode]
 }>()
 
 /** The single character in the gutter. */
@@ -106,6 +107,7 @@ function markClass(f: git.FileStatus, staged: boolean): string {
       @toggle-dir="emit('toggleDir', $event)"
       @action="emit('action', $event)"
       @discard="emit('discard', $event)"
+      @ignore="emit('ignore', $event)"
     />
 
     <div
@@ -131,6 +133,18 @@ function markClass(f: git.FileStatus, staged: boolean): string {
           <template v-else
             ><svg class="glyph" viewBox="0 0 12 12"><path d="M6 2.5v7M2.5 6h7" /></svg
           ></template>
+        </button>
+        <button
+          v-if="!staged && n.file.untracked"
+          class="tiny"
+          :disabled="busy"
+          title="Add to .gitignore"
+          @click.stop="emit('ignore', n)"
+        >
+          <svg class="glyph" viewBox="0 0 12 12">
+            <circle cx="6" cy="6" r="4" />
+            <path d="M3 9L9 3" />
+          </svg>
         </button>
         <button
           v-if="!staged"

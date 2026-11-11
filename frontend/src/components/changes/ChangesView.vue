@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import type { git, patch } from '@wails/go/models'
 import {
+  AddToGitignore,
   Commit,
   DiscardFiles,
   DiscardLines,
@@ -175,6 +176,10 @@ function nodeAction(node: TreeNode, isStaged: boolean) {
   return apply(pathsOf(node.path, node.dir, isStaged), isStaged)
 }
 
+function ignoreNode(node: TreeNode) {
+  return act(() => AddToGitignore(props.repoId, node.path))
+}
+
 function discardNode(node: TreeNode) {
   const paths = pathsOf(node.path, node.dir, false)
   if (!paths.length) return
@@ -328,6 +333,7 @@ watch(
             @toggle-dir="toggleDir"
             @action="nodeAction($event, false)"
             @discard="discardNode"
+            @ignore="ignoreNode"
           />
           <div v-if="!unstaged.length" class="empty muted">nothing to stage</div>
         </div>
