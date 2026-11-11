@@ -135,7 +135,7 @@ func TestLoadAndRange(t *testing.T) {
 		t.Errorf("Gen() = %d after a reload, want more than %d", repo.Gen(), before)
 	}
 
-	// Newest first: git log --topo-order puts children before parents.
+	// Newest first: git log --date-order puts children before parents.
 	page := repo.Range(0, 10)
 	if len(page) != 10 {
 		t.Fatalf("Range(0,10) returned %d commits", len(page))
